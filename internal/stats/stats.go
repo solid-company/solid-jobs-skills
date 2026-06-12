@@ -42,6 +42,12 @@ func Compute(ctx context.Context, q *sqlcgen.Queries, f Filter) (*Result, error)
 
 	res := &Result{ByExperience: map[string]int{}, ByDivision: map[string]int{}}
 	var salaries []int
+	// NOTE: salaries are pooled across currencies and Currency below is just the
+	// dominant one (topKey), so min/median/max are only correct when the cache is
+	// single-currency. For now SOLID.Jobs offers are effectively all PLN, so we
+	// treat the pool as PLN. If non-PLN offers become common, switch to a
+	// two-pass aggregate: tally currencyVotes, pick the dominant currency, then
+	// aggregate only matching rows and report a "mixed currencies" note.
 	currencyVotes := map[string]int{}
 
 	for _, r := range rows {
