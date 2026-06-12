@@ -57,17 +57,29 @@ func newSearchCmd() *cobra.Command {
 					offers = filterRemote(offers)
 				}
 				if gf.jsonOut {
-					return printJSON(map[string]any{
-						"pageIndex":  resp.PageIndex,
-						"pageSize":   resp.PageSize,
-						"totalCount": resp.TotalCount,
-						"totalPages": resp.TotalPages,
-						"jobs":       offers,
-					})
+					out := map[string]any{
+						"pageIndex": resp.PageIndex,
+						"pageSize":  resp.PageSize,
+						"jobs":      offers,
+					}
+					if remoteOnly {
+						// Client-side filter: server totals don't describe this subset.
+						out["filtered"] = "remote"
+						out["shown"] = len(offers)
+					} else {
+						out["totalCount"] = resp.TotalCount
+						out["totalPages"] = resp.TotalPages
+					}
+					return printJSON(out)
 				}
 				printOffersTable(offers)
-				fmt.Printf("\n%d shown · %d total · page %d/%d\n",
-					len(offers), resp.TotalCount, resp.PageIndex+1, max(resp.TotalPages, 1))
+				if remoteOnly {
+					fmt.Printf("\n%d remote offers on this page (of %d fetched, page %d/%d)\n",
+						len(offers), len(resp.Jobs), resp.PageIndex+1, max(resp.TotalPages, 1))
+				} else {
+					fmt.Printf("\n%d shown · %d total · page %d/%d\n",
+						len(offers), resp.TotalCount, resp.PageIndex+1, max(resp.TotalPages, 1))
+				}
 				return nil
 			})
 		},
