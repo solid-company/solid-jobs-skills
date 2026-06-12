@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/solid-company/solid-jobs-skills/internal/store/sqlcgen"
@@ -74,21 +73,46 @@ func (s *Store) DB() *sql.DB { return s.db }
 // Queries exposes the generated query set (used by the stats package).
 func (s *Store) Queries() *sqlcgen.Queries { return s.q }
 
-// migrate applies idempotent column additions that CREATE TABLE IF NOT EXISTS
-// can't reach on a pre-existing offers table. SQLite has no ADD COLUMN IF NOT
-// EXISTS, so a "duplicate column" error means the column is already present and
-// is treated as success.
+// migrate adds columns that CREATE TABLE IF NOT EXISTS can't reach on a
+// pre-existing offers table (SQLite has no ADD COLUMN IF NOT EXISTS). It reads
+// the current columns first and only ALTERs the missing ones, so a fresh DB —
+// where schema.sql already created them — does no work.
 func migrate(db *sql.DB) error {
-	alters := []string{
-		`ALTER TABLE offers ADD COLUMN locations TEXT`,
-		`ALTER TABLE offers ADD COLUMN skills TEXT`,
+	have, err := offerColumns(db)
+	if err != nil {
+		return err
 	}
-	for _, stmt := range alters {
-		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
-			return fmt.Errorf("migrate: %q: %w", stmt, err)
+	wanted := []struct{ name, ddl string }{
+		{"locations", `ALTER TABLE offers ADD COLUMN locations TEXT`},
+		{"skills", `ALTER TABLE offers ADD COLUMN skills TEXT`},
+	}
+	for _, c := range wanted {
+		if have[c.name] {
+			continue
+		}
+		if _, err := db.Exec(c.ddl); err != nil {
+			return fmt.Errorf("migrate: %q: %w", c.ddl, err)
 		}
 	}
 	return nil
+}
+
+// offerColumns returns the set of column names currently on the offers table.
+func offerColumns(db *sql.DB) (map[string]bool, error) {
+	rows, err := db.Query(`SELECT name FROM pragma_table_info('offers')`)
+	if err != nil {
+		return nil, fmt.Errorf("inspect offers columns: %w", err)
+	}
+	defer rows.Close()
+	cols := map[string]bool{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		cols[name] = true
+	}
+	return cols, rows.Err()
 }
 
 // now returns the current UTC time in RFC3339 for consistent text storage.
