@@ -61,6 +61,11 @@ folders — not the Go source. So the binary is delivered separately:
   matching release asset, verify its sha256, and install to
   `~/.solid-jobs-skills/bin`. Idempotent (skips if version matches). Skills curl
   these from raw GitHub when `sjctl` is absent.
+- **Signing:** GoReleaser signs `checksums.txt` with keyless **cosign** (Sigstore
+  OIDC, no stored key); the cert binds the signature to the release workflow.
+  Both installers verify `checksums.txt.{sig,pem}` when cosign is on PATH before
+  trusting the checksums (`SJCTL_SKIP_COSIGN=1` to bypass). The release workflow
+  needs `id-token: write` for OIDC.
 - **Version:** `main.version` is stamped via `-ldflags "-X main.version=..."`;
   `sjctl version` prints it, and the installer uses it to skip re-downloads.
 - **DB location:** `defaultDBPath()` resolves `SJCTL_DB` → `~/.solid-jobs-skills/solidjobs.db`,

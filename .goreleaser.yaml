@@ -43,6 +43,23 @@ checksum:
   name_template: "checksums.txt"
   algorithm: sha256
 
+# Keyless cosign signature over checksums.txt. Because every asset's digest is
+# listed there, one signature transitively covers the whole release. The cert
+# binds the signature to this repo's release workflow via Sigstore/Fulcio OIDC —
+# no long-lived private key to manage. Installers verify checksums.txt.{sig,pem}
+# before trusting the checksums.
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    output: true
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+
 snapshot:
   version_template: "{{ incpatch .Version }}-snapshot"
 

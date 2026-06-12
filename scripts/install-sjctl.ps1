@@ -7,9 +7,10 @@
   re-run: it skips the download if the installed version already matches.
 
   Environment overrides:
-    SJCTL_REPO     owner/repo to pull releases from (default below)
-    SJCTL_VERSION  release tag to install, e.g. v0.1.0 (default: latest)
-    SJCTL_BIN_DIR  install directory (default: ~/.solid-jobs-skills/bin)
+    SJCTL_REPO        owner/repo to pull releases from (default below)
+    SJCTL_VERSION     release tag to install, e.g. v0.1.0 (default: latest)
+    SJCTL_BIN_DIR     install directory (default: ~/.solid-jobs-skills\bin)
+    SJCTL_SKIP_COSIGN set to 1 to skip cosign signature verification
 #>
 $ErrorActionPreference = "Stop"
 
@@ -49,6 +50,29 @@ try {
   Invoke-WebRequest -Uri "$base/$asset" -OutFile $zip -UseBasicParsing
   $sumFile = Join-Path $tmp "checksums.txt"
   Invoke-WebRequest -Uri "$base/checksums.txt" -OutFile $sumFile -UseBasicParsing
+
+  # --- verify the cosign signature over checksums.txt ------------------------
+  # The sha256 match only proves the asset agrees with checksums.txt fetched
+  # over the same channel. The keyless cosign signature proves checksums.txt was
+  # produced by this repo's release workflow. Verified when cosign is on PATH;
+  # set SJCTL_SKIP_COSIGN=1 to bypass (not recommended).
+  if ($env:SJCTL_SKIP_COSIGN -eq "1") {
+    Write-Warning "install-sjctl: skipping cosign verification (SJCTL_SKIP_COSIGN=1)"
+  } elseif (Get-Command cosign -ErrorAction SilentlyContinue) {
+    $sig = Join-Path $tmp "checksums.txt.sig"
+    $cert = Join-Path $tmp "checksums.txt.pem"
+    Invoke-WebRequest -Uri "$base/checksums.txt.sig" -OutFile $sig -UseBasicParsing
+    Invoke-WebRequest -Uri "$base/checksums.txt.pem" -OutFile $cert -UseBasicParsing
+    & cosign verify-blob `
+      --certificate $cert `
+      --signature $sig `
+      --certificate-identity-regexp "^https://github.com/$repo/" `
+      --certificate-oidc-issuer "https://token.actions.githubusercontent.com" `
+      $sumFile 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "install-sjctl: cosign signature verification failed for checksums.txt" }
+  } else {
+    Write-Warning "install-sjctl: cosign not found; skipping signature verification (install cosign or set SJCTL_SKIP_COSIGN=1 to silence)"
+  }
 
   $expected = (Select-String -Path $sumFile -Pattern ([regex]::Escape($asset)) |
     Select-Object -First 1).Line.Split(" ")[0]
