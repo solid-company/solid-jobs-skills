@@ -36,9 +36,7 @@ func newStatsCmd() *cobra.Command {
 					return nil
 				}
 				cur := res.Currency
-				if cur == "" {
-					cur = ""
-				} else {
+				if cur != "" {
 					cur = " " + cur
 				}
 				fmt.Printf("Offers:        %d (%d with salary)\n", res.OfferCount, res.WithSalary)
@@ -52,6 +50,12 @@ func newStatsCmd() *cobra.Command {
 					fmt.Println("By experience:")
 					for level, n := range res.ByExperience {
 						fmt.Printf("  %-12s %d\n", level, n)
+					}
+				}
+				if len(res.ByDivision) > 0 {
+					fmt.Println("By division:")
+					for div, n := range res.ByDivision {
+						fmt.Printf("  %-12s %d\n", div, n)
 					}
 				}
 				return nil

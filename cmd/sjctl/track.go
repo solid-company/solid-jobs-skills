@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -125,7 +126,7 @@ func newTrackNoteCmd() *cobra.Command {
 		Short: "Attach a note to a tracked offer",
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			note := joinArgs(args[1:])
+			note := strings.Join(args[1:], " ")
 			return withService(func(s *jobs.Service) error {
 				pid, err := s.ResolveProfileID(cmd.Context(), gf.profile)
 				if err != nil {
@@ -160,15 +161,4 @@ func newTrackRmCmd() *cobra.Command {
 			})
 		},
 	}
-}
-
-func joinArgs(args []string) string {
-	out := ""
-	for i, a := range args {
-		if i > 0 {
-			out += " "
-		}
-		out += a
-	}
-	return out
 }

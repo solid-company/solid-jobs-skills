@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -42,6 +43,10 @@ func newEvaluateSaveCmd() *cobra.Command {
 			if grade == "" {
 				return errors.New("--grade is required")
 			}
+			grade = strings.ToUpper(grade)
+			if !store.ValidGrade(grade) {
+				return fmt.Errorf("invalid grade %q (want A-F)", grade)
+			}
 			return withService(func(s *jobs.Service) error {
 				pid, err := s.ResolveProfileID(cmd.Context(), gf.profile)
 				if err != nil {
@@ -60,7 +65,7 @@ func newEvaluateSaveCmd() *cobra.Command {
 				if gf.jsonOut {
 					return printJSON(e)
 				}
-				fmt.Printf("saved evaluation %s for %s (grade %s)\n", "#"+itoa(e.ID), args[0], e.Grade)
+				fmt.Printf("saved evaluation #%d for %s (grade %s)\n", e.ID, args[0], e.Grade)
 				return nil
 			})
 		},
@@ -105,5 +110,3 @@ func newEvaluateShowCmd() *cobra.Command {
 		},
 	}
 }
-
-func itoa(n int64) string { return fmt.Sprintf("%d", n) }
