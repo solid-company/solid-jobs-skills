@@ -1,0 +1,76 @@
+version: 2
+
+# sjctl ships as a self-contained, statically linked binary. modernc.org/sqlite
+# is pure Go, so CGO is off and every target cross-compiles cleanly.
+project_name: sjctl
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: sjctl
+    main: ./cmd/sjctl
+    binary: sjctl
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: sjctl
+    # Asset name the bootstrap scripts resolve: sjctl_<os>_<arch>.<ext>
+    name_template: "sjctl_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+# Keyless cosign signature over checksums.txt. Because every asset's digest is
+# listed there, one signature transitively covers the whole release. The cert
+# binds the signature to this repo's release workflow via Sigstore/Fulcio OIDC —
+# no long-lived private key to manage. Installers verify checksums.txt.{sig,pem}
+# before trusting the checksums.
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    output: true
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot"
+
+release:
+  draft: false
+  prerelease: auto
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"

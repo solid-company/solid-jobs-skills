@@ -1,0 +1,16 @@
+# Local data (SQLite DB, caches)
+/data/
+# Generated output (PDFs, exports) — post-MVP
+/output/
+# Build artifacts
+/sjctl
+/sjctl.exe
+/bin/
+/dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
