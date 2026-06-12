@@ -1,10 +1,12 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/solid-company/solid-jobs-skills/internal/api"
@@ -16,8 +18,8 @@ var ErrNotFound = errors.New("not found")
 
 // UpsertOffers caches a batch of offers, replacing any existing rows by key and
 // stamping them with the current fetch time.
-func (s *Store) UpsertOffers(offers []api.Offer) error {
-	tx, err := s.db.Begin()
+func (s *Store) UpsertOffers(ctx context.Context, offers []api.Offer) error {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -37,7 +39,7 @@ func (s *Store) UpsertOffers(offers []api.Offer) error {
 			from, to = nullRound(o.Salary.From), nullRound(o.Salary.To)
 			currency = nullStr(o.Salary.Currency)
 		}
-		if err := qtx.UpsertOffer(bg(), sqlcgen.UpsertOfferParams{
+		if err := qtx.UpsertOffer(ctx, sqlcgen.UpsertOfferParams{
 			OfferKey:        o.JobOfferKey,
 			Title:           o.Title,
 			Company:         o.Company,
@@ -53,6 +55,8 @@ func (s *Store) UpsertOffers(offers []api.Offer) error {
 			ValidFrom:       nullStr(fmtTime(o.ValidFrom)),
 			ValidTo:         nullStr(fmtTime(o.ValidTo)),
 			Url:             nullStr(o.URL),
+			Locations:       nullStr(strings.Join(o.Locations, "\n")),
+			Skills:          nullStr(skillNames(o.Skills)),
 			Raw:             string(raw),
 			FetchedAt:       ts,
 		}); err != nil {
@@ -63,8 +67,8 @@ func (s *Store) UpsertOffers(offers []api.Offer) error {
 }
 
 // GetOffer reconstructs a cached offer from its stored raw JSON.
-func (s *Store) GetOffer(key string) (*api.Offer, error) {
-	raw, err := s.q.GetOfferRaw(bg(), key)
+func (s *Store) GetOffer(ctx context.Context, key string) (*api.Offer, error) {
+	raw, err := s.q.GetOfferRaw(ctx, key)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -79,8 +83,21 @@ func (s *Store) GetOffer(key string) (*api.Offer, error) {
 }
 
 // OfferExists reports whether an offer with the given key is cached.
-func (s *Store) OfferExists(key string) (bool, error) {
-	return s.q.OfferExists(bg(), key)
+func (s *Store) OfferExists(ctx context.Context, key string) (bool, error) {
+	return s.q.OfferExists(ctx, key)
+}
+
+// skillNames joins an offer's skill names with newlines so the skill filter can
+// LIKE-match against real skill fields rather than the whole raw JSON.
+func skillNames(skills []api.NamedLevel) string {
+	if len(skills) == 0 {
+		return ""
+	}
+	names := make([]string, len(skills))
+	for i, sk := range skills {
+		names[i] = sk.Name
+	}
+	return strings.Join(names, "\n")
 }
 
 // nullRound rounds a nullable float salary to a nullable integer for storage.

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,15 @@ import (
 
 	"github.com/solid-company/solid-jobs-skills/internal/store/sqlcgen"
 )
+
+// validGrades is the set of overall grades an evaluation may carry (A best, F
+// worst), matching what the jobs-evaluate skill produces.
+var validGrades = map[string]bool{
+	"A": true, "B": true, "C": true, "D": true, "E": true, "F": true,
+}
+
+// ValidGrade reports whether g is an accepted A–F grade.
+func ValidGrade(g string) bool { return validGrades[g] }
 
 // Evaluation is an AI scoring of an offer against a profile.
 type Evaluation struct {
@@ -22,8 +32,8 @@ type Evaluation struct {
 
 // SaveEvaluation records a new evaluation row (history is preserved). The offer
 // must be cached.
-func (s *Store) SaveEvaluation(e Evaluation) (*Evaluation, error) {
-	ok, err := s.OfferExists(e.OfferKey)
+func (s *Store) SaveEvaluation(ctx context.Context, e Evaluation) (*Evaluation, error) {
+	ok, err := s.OfferExists(ctx, e.OfferKey)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +48,7 @@ func (s *Store) SaveEvaluation(e Evaluation) (*Evaluation, error) {
 	if err != nil {
 		return nil, fmt.Errorf("marshal dimensions: %w", err)
 	}
-	row, err := s.q.InsertEvaluation(bg(), sqlcgen.InsertEvaluationParams{
+	row, err := s.q.InsertEvaluation(ctx, sqlcgen.InsertEvaluationParams{
 		OfferKey:   e.OfferKey,
 		ProfileID:  e.ProfileID,
 		Grade:      e.Grade,
@@ -56,8 +66,8 @@ func (s *Store) SaveEvaluation(e Evaluation) (*Evaluation, error) {
 }
 
 // LatestEvaluation returns the most recent evaluation for an offer+profile.
-func (s *Store) LatestEvaluation(offerKey string, profileID int64) (*Evaluation, error) {
-	r, err := s.q.LatestEvaluation(bg(), sqlcgen.LatestEvaluationParams{
+func (s *Store) LatestEvaluation(ctx context.Context, offerKey string, profileID int64) (*Evaluation, error) {
+	r, err := s.q.LatestEvaluation(ctx, sqlcgen.LatestEvaluationParams{
 		OfferKey: offerKey, ProfileID: profileID,
 	})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -75,7 +85,9 @@ func (s *Store) LatestEvaluation(offerKey string, profileID int64) (*Evaluation,
 		CreatedAt: r.CreatedAt,
 	}
 	if r.Dimensions != "" {
-		_ = json.Unmarshal([]byte(r.Dimensions), &e.Dimensions)
+		if err := json.Unmarshal([]byte(r.Dimensions), &e.Dimensions); err != nil {
+			return nil, fmt.Errorf("decode evaluation dimensions for offer %q: %w", offerKey, err)
+		}
 	}
 	return &e, nil
 }

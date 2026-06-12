@@ -8,6 +8,7 @@ package sqlcgen
 import (
 	"context"
 	"database/sql"
+	"strings"
 )
 
 const countProfiles = `-- name: CountProfiles :one
@@ -514,8 +515,12 @@ SELECT salary_from, salary_to, currency, is_remote, experience_level, division
 FROM offers
 WHERE (CAST(?1 AS TEXT) IS NULL OR division = ?1)
   AND (CAST(?2 AS INTEGER) IS NULL OR is_remote = ?2)
-  AND (CAST(?3 AS TEXT) IS NULL OR raw LIKE ?3 OR title LIKE ?3)
-  AND (CAST(?4 AS TEXT) IS NULL OR raw LIKE ?4)
+  AND (CAST(?3 AS TEXT) IS NULL
+       OR title LIKE ?3
+       OR category LIKE ?3
+       OR sub_category LIKE ?3
+       OR skills LIKE ?3)
+  AND (CAST(?4 AS TEXT) IS NULL OR locations LIKE ?4)
 `
 
 type SalaryRowsParams struct {
@@ -583,6 +588,43 @@ type SeedDefaultProfileParams struct {
 func (q *Queries) SeedDefaultProfile(ctx context.Context, arg SeedDefaultProfileParams) error {
 	_, err := q.db.ExecContext(ctx, seedDefaultProfile, arg.Name, arg.CreatedAt, arg.UpdatedAt)
 	return err
+}
+
+const seenKeys = `-- name: SeenKeys :many
+SELECT offer_key FROM seen WHERE offer_key IN (/*SLICE:keys*/?)
+`
+
+func (q *Queries) SeenKeys(ctx context.Context, keys []string) ([]string, error) {
+	query := seenKeys
+	var queryParams []interface{}
+	if len(keys) > 0 {
+		for _, v := range keys {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:keys*/?", strings.Repeat(",?", len(keys))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:keys*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var offer_key string
+		if err := rows.Scan(&offer_key); err != nil {
+			return nil, err
+		}
+		items = append(items, offer_key)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const setDefaultProfile = `-- name: SetDefaultProfile :exec
@@ -667,8 +709,8 @@ const upsertOffer = `-- name: UpsertOffer :exec
 
 INSERT INTO offers (offer_key, title, company, division, category, sub_category,
     experience_level, salary_from, salary_to, currency, is_remote, is_hybrid,
-    valid_from, valid_to, url, raw, fetched_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    valid_from, valid_to, url, locations, skills, raw, fetched_at)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(offer_key) DO UPDATE SET
     title=excluded.title, company=excluded.company, division=excluded.division,
     category=excluded.category, sub_category=excluded.sub_category,
@@ -676,7 +718,8 @@ ON CONFLICT(offer_key) DO UPDATE SET
     salary_to=excluded.salary_to, currency=excluded.currency,
     is_remote=excluded.is_remote, is_hybrid=excluded.is_hybrid,
     valid_from=excluded.valid_from, valid_to=excluded.valid_to,
-    url=excluded.url, raw=excluded.raw, fetched_at=excluded.fetched_at
+    url=excluded.url, locations=excluded.locations, skills=excluded.skills,
+    raw=excluded.raw, fetched_at=excluded.fetched_at
 `
 
 type UpsertOfferParams struct {
@@ -695,6 +738,8 @@ type UpsertOfferParams struct {
 	ValidFrom       sql.NullString
 	ValidTo         sql.NullString
 	Url             sql.NullString
+	Locations       sql.NullString
+	Skills          sql.NullString
 	Raw             string
 	FetchedAt       string
 }
@@ -719,6 +764,8 @@ func (q *Queries) UpsertOffer(ctx context.Context, arg UpsertOfferParams) error 
 		arg.ValidFrom,
 		arg.ValidTo,
 		arg.Url,
+		arg.Locations,
+		arg.Skills,
 		arg.Raw,
 		arg.FetchedAt,
 	)

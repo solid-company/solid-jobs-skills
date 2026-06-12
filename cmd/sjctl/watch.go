@@ -50,7 +50,7 @@ func newWatchAddCmd() *cobra.Command {
 				return err
 			}
 			return withService(func(s *jobs.Service) error {
-				w, err := s.Store.AddWatch(args[0], division, string(raw))
+				w, err := s.Store.AddWatch(cmd.Context(), args[0], division, string(raw))
 				if err != nil {
 					return fail("watch add", err)
 				}
@@ -76,7 +76,7 @@ func newWatchListCmd() *cobra.Command {
 		Short: "List saved watches",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withService(func(s *jobs.Service) error {
-				ws, err := s.Store.ListWatches()
+				ws, err := s.Store.ListWatches(cmd.Context())
 				if err != nil {
 					return fail("watch list", err)
 				}
@@ -106,7 +106,7 @@ func newWatchRmCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withService(func(s *jobs.Service) error {
-				if err := s.Store.RemoveWatch(args[0]); err != nil {
+				if err := s.Store.RemoveWatch(cmd.Context(), args[0]); err != nil {
 					return fail("watch rm", err)
 				}
 				fmt.Printf("removed watch %q\n", args[0])

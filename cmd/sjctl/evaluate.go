@@ -43,11 +43,11 @@ func newEvaluateSaveCmd() *cobra.Command {
 				return errors.New("--grade is required")
 			}
 			return withService(func(s *jobs.Service) error {
-				pid, err := s.ResolveProfileID(gf.profile)
+				pid, err := s.ResolveProfileID(cmd.Context(), gf.profile)
 				if err != nil {
 					return fail("resolve profile", err)
 				}
-				e, err := s.Store.SaveEvaluation(store.Evaluation{
+				e, err := s.Store.SaveEvaluation(cmd.Context(), store.Evaluation{
 					OfferKey:   args[0],
 					ProfileID:  pid,
 					Grade:      grade,
@@ -79,11 +79,11 @@ func newEvaluateShowCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withService(func(s *jobs.Service) error {
-				pid, err := s.ResolveProfileID(gf.profile)
+				pid, err := s.ResolveProfileID(cmd.Context(), gf.profile)
 				if err != nil {
 					return fail("resolve profile", err)
 				}
-				e, err := s.Store.LatestEvaluation(args[0], pid)
+				e, err := s.Store.LatestEvaluation(cmd.Context(), args[0], pid)
 				if err != nil {
 					if errors.Is(err, store.ErrNotFound) {
 						return fmt.Errorf("no evaluation for %s", args[0])

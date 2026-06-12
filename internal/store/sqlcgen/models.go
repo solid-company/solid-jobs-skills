@@ -34,6 +34,8 @@ type Offer struct {
 	ValidFrom       sql.NullString
 	ValidTo         sql.NullString
 	Url             sql.NullString
+	Locations       sql.NullString
+	Skills          sql.NullString
 	Raw             string
 	FetchedAt       string
 }

@@ -36,6 +36,7 @@ type Querier interface {
 	RemoveWatch(ctx context.Context, name string) (int64, error)
 	SalaryRows(ctx context.Context, arg SalaryRowsParams) ([]SalaryRowsRow, error)
 	SeedDefaultProfile(ctx context.Context, arg SeedDefaultProfileParams) error
+	SeenKeys(ctx context.Context, keys []string) ([]string, error)
 	SetDefaultProfile(ctx context.Context, id int64) error
 	SetNotes(ctx context.Context, arg SetNotesParams) (int64, error)
 	SetProfileContent(ctx context.Context, arg SetProfileContentParams) (int64, error)

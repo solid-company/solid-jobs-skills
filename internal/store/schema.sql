@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS offers (
     valid_from       TEXT,
     valid_to         TEXT,
     url              TEXT,
+    locations        TEXT,  -- newline-joined offer.locations, for city filtering
+    skills           TEXT,  -- newline-joined offer.skills names, for skill filtering
     raw              TEXT NOT NULL,
     fetched_at       TEXT NOT NULL
 );
@@ -65,6 +67,9 @@ CREATE TABLE IF NOT EXISTS evaluations (
 CREATE INDEX IF NOT EXISTS idx_eval_offer ON evaluations(offer_key, profile_id);
 
 -- Offer keys already reported by `sync`, so a new run only surfaces new offers.
+-- NOTE: this table grows unbounded — there's no pruning of old keys. Fine for a
+-- personal tool (one row per offer ever seen), but if it ever matters, prune by
+-- seen_at (the column exists for exactly this) or join against live offers.
 CREATE TABLE IF NOT EXISTS seen (
     offer_key TEXT PRIMARY KEY,
     seen_at   TEXT NOT NULL

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -20,11 +21,11 @@ type Profile struct {
 
 // AddProfile creates a new profile. If makeDefault is true it becomes the
 // default (clearing the flag on all others).
-func (s *Store) AddProfile(name, content string, makeDefault bool) (*Profile, error) {
+func (s *Store) AddProfile(ctx context.Context, name, content string, makeDefault bool) (*Profile, error) {
 	if name == "" {
 		return nil, errors.New("profile name required")
 	}
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -32,26 +33,26 @@ func (s *Store) AddProfile(name, content string, makeDefault bool) (*Profile, er
 	qtx := s.q.WithTx(tx)
 
 	ts := now()
-	id, err := qtx.InsertProfile(bg(), sqlcgen.InsertProfileParams{
+	id, err := qtx.InsertProfile(ctx, sqlcgen.InsertProfileParams{
 		Name: name, Content: content, CreatedAt: ts, UpdatedAt: ts,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("insert profile: %w", err)
 	}
 	if makeDefault {
-		if err := qtx.SetDefaultProfile(bg(), id); err != nil {
+		if err := qtx.SetDefaultProfile(ctx, id); err != nil {
 			return nil, err
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return s.GetProfile(id)
+	return s.GetProfile(ctx, id)
 }
 
 // SetProfileContent replaces a profile's content (e.g. imported from profile.md).
-func (s *Store) SetProfileContent(id int64, content string) error {
-	n, err := s.q.SetProfileContent(bg(), sqlcgen.SetProfileContentParams{
+func (s *Store) SetProfileContent(ctx context.Context, id int64, content string) error {
+	n, err := s.q.SetProfileContent(ctx, sqlcgen.SetProfileContentParams{
 		Content: content, UpdatedAt: now(), ID: id,
 	})
 	if err != nil {
@@ -65,38 +66,38 @@ func (s *Store) SetProfileContent(id int64, content string) error {
 
 // SetDefaultProfile marks a single profile as the default, clearing the flag on
 // all others.
-func (s *Store) SetDefaultProfile(id int64) error {
-	exists, err := s.q.ProfileExists(bg(), id)
+func (s *Store) SetDefaultProfile(ctx context.Context, id int64) error {
+	exists, err := s.q.ProfileExists(ctx, id)
 	if err != nil {
 		return err
 	}
 	if !exists {
 		return ErrNotFound
 	}
-	return s.q.SetDefaultProfile(bg(), id)
+	return s.q.SetDefaultProfile(ctx, id)
 }
 
 // GetProfile fetches a profile by id.
-func (s *Store) GetProfile(id int64) (*Profile, error) {
-	p, err := s.q.GetProfile(bg(), id)
+func (s *Store) GetProfile(ctx context.Context, id int64) (*Profile, error) {
+	p, err := s.q.GetProfile(ctx, id)
 	return toProfile(p, err)
 }
 
 // GetProfileByName fetches a profile by its unique name.
-func (s *Store) GetProfileByName(name string) (*Profile, error) {
-	p, err := s.q.GetProfileByName(bg(), name)
+func (s *Store) GetProfileByName(ctx context.Context, name string) (*Profile, error) {
+	p, err := s.q.GetProfileByName(ctx, name)
 	return toProfile(p, err)
 }
 
 // DefaultProfile returns the current default profile.
-func (s *Store) DefaultProfile() (*Profile, error) {
-	p, err := s.q.DefaultProfile(bg())
+func (s *Store) DefaultProfile(ctx context.Context) (*Profile, error) {
+	p, err := s.q.DefaultProfile(ctx)
 	return toProfile(p, err)
 }
 
 // ListProfiles returns all profiles, default first then by name.
-func (s *Store) ListProfiles() ([]Profile, error) {
-	rows, err := s.q.ListProfiles(bg())
+func (s *Store) ListProfiles(ctx context.Context) ([]Profile, error) {
+	rows, err := s.q.ListProfiles(ctx)
 	if err != nil {
 		return nil, err
 	}

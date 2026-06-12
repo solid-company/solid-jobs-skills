@@ -34,11 +34,11 @@ func newTrackAddCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withService(func(s *jobs.Service) error {
-				pid, err := s.ResolveProfileID(gf.profile)
+				pid, err := s.ResolveProfileID(cmd.Context(), gf.profile)
 				if err != nil {
 					return fail("resolve profile", err)
 				}
-				if err := s.Store.AddTracked(args[0], pid); err != nil {
+				if err := s.Store.AddTracked(cmd.Context(), args[0], pid); err != nil {
 					return fail("track add", err)
 				}
 				fmt.Printf("tracking %s\n", args[0])
@@ -58,11 +58,11 @@ func newTrackListCmd() *cobra.Command {
 				return fmt.Errorf("invalid status %q", status)
 			}
 			return withService(func(s *jobs.Service) error {
-				pid, err := s.ResolveProfileID(gf.profile)
+				pid, err := s.ResolveProfileID(cmd.Context(), gf.profile)
 				if err != nil {
 					return fail("resolve profile", err)
 				}
-				items, err := s.Store.ListTracked(pid, status)
+				items, err := s.Store.ListTracked(cmd.Context(), pid, status)
 				if err != nil {
 					return fail("track list", err)
 				}
@@ -102,11 +102,11 @@ func newTrackSetCmd() *cobra.Command {
 				return fmt.Errorf("invalid status %q (saved|applied|interview|offer|rejected|expired)", args[1])
 			}
 			return withService(func(s *jobs.Service) error {
-				pid, err := s.ResolveProfileID(gf.profile)
+				pid, err := s.ResolveProfileID(cmd.Context(), gf.profile)
 				if err != nil {
 					return fail("resolve profile", err)
 				}
-				if err := s.Store.SetStatus(args[0], pid, args[1]); err != nil {
+				if err := s.Store.SetStatus(cmd.Context(), args[0], pid, args[1]); err != nil {
 					if errors.Is(err, store.ErrNotFound) {
 						return fmt.Errorf("offer %s is not tracked", args[0])
 					}
@@ -127,11 +127,11 @@ func newTrackNoteCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			note := joinArgs(args[1:])
 			return withService(func(s *jobs.Service) error {
-				pid, err := s.ResolveProfileID(gf.profile)
+				pid, err := s.ResolveProfileID(cmd.Context(), gf.profile)
 				if err != nil {
 					return fail("resolve profile", err)
 				}
-				if err := s.Store.SetNotes(args[0], pid, note); err != nil {
+				if err := s.Store.SetNotes(cmd.Context(), args[0], pid, note); err != nil {
 					return fail("track note", err)
 				}
 				fmt.Printf("note saved for %s\n", args[0])
@@ -148,11 +148,11 @@ func newTrackRmCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withService(func(s *jobs.Service) error {
-				pid, err := s.ResolveProfileID(gf.profile)
+				pid, err := s.ResolveProfileID(cmd.Context(), gf.profile)
 				if err != nil {
 					return fail("resolve profile", err)
 				}
-				if err := s.Store.RemoveTracked(args[0], pid); err != nil {
+				if err := s.Store.RemoveTracked(cmd.Context(), args[0], pid); err != nil {
 					return fail("track rm", err)
 				}
 				fmt.Printf("untracked %s\n", args[0])

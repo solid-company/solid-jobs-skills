@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/solid-company/solid-jobs-skills/internal/store/sqlcgen"
@@ -51,9 +52,13 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
+	if err := migrate(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 
 	s := &Store{db: db, q: sqlcgen.New(db)}
-	if err := s.seedDefaultProfile(); err != nil {
+	if err := s.seedDefaultProfile(context.Background()); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -69,15 +74,29 @@ func (s *Store) DB() *sql.DB { return s.db }
 // Queries exposes the generated query set (used by the stats package).
 func (s *Store) Queries() *sqlcgen.Queries { return s.q }
 
-// bg is the background context used for the synchronous store API.
-func bg() context.Context { return context.Background() }
+// migrate applies idempotent column additions that CREATE TABLE IF NOT EXISTS
+// can't reach on a pre-existing offers table. SQLite has no ADD COLUMN IF NOT
+// EXISTS, so a "duplicate column" error means the column is already present and
+// is treated as success.
+func migrate(db *sql.DB) error {
+	alters := []string{
+		`ALTER TABLE offers ADD COLUMN locations TEXT`,
+		`ALTER TABLE offers ADD COLUMN skills TEXT`,
+	}
+	for _, stmt := range alters {
+		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("migrate: %q: %w", stmt, err)
+		}
+	}
+	return nil
+}
 
 // now returns the current UTC time in RFC3339 for consistent text storage.
 func now() string { return time.Now().UTC().Format(time.RFC3339) }
 
 // seedDefaultProfile inserts the default profile if no profiles exist yet.
-func (s *Store) seedDefaultProfile() error {
-	n, err := s.q.CountProfiles(bg())
+func (s *Store) seedDefaultProfile(ctx context.Context) error {
+	n, err := s.q.CountProfiles(ctx)
 	if err != nil {
 		return fmt.Errorf("count profiles: %w", err)
 	}
@@ -85,7 +104,7 @@ func (s *Store) seedDefaultProfile() error {
 		return nil
 	}
 	ts := now()
-	if err := s.q.SeedDefaultProfile(bg(), sqlcgen.SeedDefaultProfileParams{
+	if err := s.q.SeedDefaultProfile(ctx, sqlcgen.SeedDefaultProfileParams{
 		Name: DefaultProfileName, CreatedAt: ts, UpdatedAt: ts,
 	}); err != nil {
 		return fmt.Errorf("seed default profile: %w", err)

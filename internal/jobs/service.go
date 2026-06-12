@@ -33,7 +33,7 @@ func (s *Service) SearchOffers(ctx context.Context, division string, p api.Searc
 		return nil, err
 	}
 	if len(resp.Jobs) > 0 {
-		if err := s.Store.UpsertOffers(resp.Jobs); err != nil {
+		if err := s.Store.UpsertOffers(ctx, resp.Jobs); err != nil {
 			return nil, err
 		}
 	}
@@ -42,15 +42,15 @@ func (s *Service) SearchOffers(ctx context.Context, division string, p api.Searc
 
 // ResolveProfileID returns the id of the named profile, or the default profile
 // when name is empty.
-func (s *Service) ResolveProfileID(name string) (int64, error) {
+func (s *Service) ResolveProfileID(ctx context.Context, name string) (int64, error) {
 	if name == "" {
-		p, err := s.Store.DefaultProfile()
+		p, err := s.Store.DefaultProfile(ctx)
 		if err != nil {
 			return 0, err
 		}
 		return p.ID, nil
 	}
-	p, err := s.Store.GetProfileByName(name)
+	p, err := s.Store.GetProfileByName(ctx, name)
 	if err != nil {
 		return 0, err
 	}
@@ -58,8 +58,8 @@ func (s *Service) ResolveProfileID(name string) (int64, error) {
 }
 
 // SalaryStats computes a market snapshot over cached offers.
-func (s *Service) SalaryStats(f stats.Filter) (*stats.Result, error) {
-	return stats.Compute(context.Background(), s.Store.Queries(), f)
+func (s *Service) SalaryStats(ctx context.Context, f stats.Filter) (*stats.Result, error) {
+	return stats.Compute(ctx, s.Store.Queries(), f)
 }
 
 // NewOffer pairs a fresh offer with the watch that surfaced it.
@@ -79,7 +79,7 @@ type SyncResult struct {
 // previously reported. Newly reported keys are recorded in the seen set so a
 // second run surfaces nothing new.
 func (s *Service) RunSync(ctx context.Context) (*SyncResult, error) {
-	watches, err := s.Store.ListWatches()
+	watches, err := s.Store.ListWatches(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -98,21 +98,21 @@ func (s *Service) RunSync(ctx context.Context) (*SyncResult, error) {
 		out.WatchesRun++
 		out.TotalSeen += len(resp.Jobs)
 
-		for i := range resp.Jobs {
-			o := resp.Jobs[i]
-			seen, err := s.Store.IsSeen(o.JobOfferKey)
-			if err != nil {
-				return nil, err
-			}
-			if !seen {
-				out.New = append(out.New, NewOffer{Watch: w.Name, Offer: o})
-			}
-		}
 		keys := make([]string, len(resp.Jobs))
 		for i := range resp.Jobs {
 			keys[i] = resp.Jobs[i].JobOfferKey
 		}
-		if _, err := s.Store.MarkSeen(keys); err != nil {
+		seen, err := s.Store.SeenKeys(ctx, keys)
+		if err != nil {
+			return nil, err
+		}
+		for i := range resp.Jobs {
+			o := resp.Jobs[i]
+			if !seen[o.JobOfferKey] {
+				out.New = append(out.New, NewOffer{Watch: w.Name, Offer: o})
+			}
+		}
+		if _, err := s.Store.MarkSeen(ctx, keys); err != nil {
 			return nil, err
 		}
 	}

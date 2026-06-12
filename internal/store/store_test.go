@@ -1,12 +1,16 @@
 package store
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/solid-company/solid-jobs-skills/internal/api"
 )
+
+// ctx is the background context used across store tests.
+var ctx = context.Background()
 
 func openTemp(t *testing.T) *Store {
 	t.Helper()
@@ -35,7 +39,7 @@ func sampleOffer(key string, validTo time.Time) api.Offer {
 
 func TestSeedDefaultProfile(t *testing.T) {
 	s := openTemp(t)
-	p, err := s.DefaultProfile()
+	p, err := s.DefaultProfile(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,10 +51,10 @@ func TestSeedDefaultProfile(t *testing.T) {
 func TestOfferUpsertAndGet(t *testing.T) {
 	s := openTemp(t)
 	o := sampleOffer("k1", time.Now().Add(24*time.Hour))
-	if err := s.UpsertOffers([]api.Offer{o}); err != nil {
+	if err := s.UpsertOffers(ctx, []api.Offer{o}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := s.GetOffer("k1")
+	got, err := s.GetOffer(ctx, "k1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,10 +64,10 @@ func TestOfferUpsertAndGet(t *testing.T) {
 
 	// Upsert again with a changed title; should update, not duplicate.
 	o.Title = "Senior Go Developer"
-	if err := s.UpsertOffers([]api.Offer{o}); err != nil {
+	if err := s.UpsertOffers(ctx, []api.Offer{o}); err != nil {
 		t.Fatal(err)
 	}
-	got, _ = s.GetOffer("k1")
+	got, _ = s.GetOffer(ctx, "k1")
 	if got.Title != "Senior Go Developer" {
 		t.Errorf("upsert did not update title: %q", got.Title)
 	}
@@ -74,27 +78,27 @@ func TestTrackerLifecycle(t *testing.T) {
 	pid := mustDefaultID(t, s)
 
 	// Cannot track an uncached offer.
-	if err := s.AddTracked("ghost", pid); err == nil {
+	if err := s.AddTracked(ctx, "ghost", pid); err == nil {
 		t.Error("expected error tracking uncached offer")
 	}
 
-	s.UpsertOffers([]api.Offer{sampleOffer("k1", time.Now().Add(24*time.Hour))})
-	if err := s.AddTracked("k1", pid); err != nil {
+	s.UpsertOffers(ctx, []api.Offer{sampleOffer("k1", time.Now().Add(24*time.Hour))})
+	if err := s.AddTracked(ctx, "k1", pid); err != nil {
 		t.Fatal(err)
 	}
 	// Idempotent add.
-	if err := s.AddTracked("k1", pid); err != nil {
+	if err := s.AddTracked(ctx, "k1", pid); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := s.SetStatus("k1", pid, StatusApplied); err != nil {
+	if err := s.SetStatus(ctx, "k1", pid, StatusApplied); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetStatus("k1", pid, "bogus"); err == nil {
+	if err := s.SetStatus(ctx, "k1", pid, "bogus"); err == nil {
 		t.Error("expected invalid status error")
 	}
 
-	items, err := s.ListTracked(pid, "")
+	items, err := s.ListTracked(ctx, pid, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +107,7 @@ func TestTrackerLifecycle(t *testing.T) {
 	}
 
 	// Filter by status.
-	none, _ := s.ListTracked(pid, StatusInterview)
+	none, _ := s.ListTracked(ctx, pid, StatusInterview)
 	if len(none) != 0 {
 		t.Errorf("expected no interview-stage items, got %d", len(none))
 	}
@@ -113,10 +117,10 @@ func TestExpireStale(t *testing.T) {
 	s := openTemp(t)
 	pid := mustDefaultID(t, s)
 
-	s.UpsertOffers([]api.Offer{sampleOffer("old", time.Now().Add(-time.Hour))})
-	s.AddTracked("old", pid)
+	s.UpsertOffers(ctx, []api.Offer{sampleOffer("old", time.Now().Add(-time.Hour))})
+	s.AddTracked(ctx, "old", pid)
 
-	items, err := s.ListTracked(pid, "")
+	items, err := s.ListTracked(ctx, pid, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,11 +132,11 @@ func TestExpireStale(t *testing.T) {
 func TestExpireSkipsTerminal(t *testing.T) {
 	s := openTemp(t)
 	pid := mustDefaultID(t, s)
-	s.UpsertOffers([]api.Offer{sampleOffer("won", time.Now().Add(-time.Hour))})
-	s.AddTracked("won", pid)
-	s.SetStatus("won", pid, StatusOffer)
+	s.UpsertOffers(ctx, []api.Offer{sampleOffer("won", time.Now().Add(-time.Hour))})
+	s.AddTracked(ctx, "won", pid)
+	s.SetStatus(ctx, "won", pid, StatusOffer)
 
-	items, _ := s.ListTracked(pid, "")
+	items, _ := s.ListTracked(ctx, pid, "")
 	if items[0].Status != StatusOffer {
 		t.Errorf("terminal status should not expire, got %q", items[0].Status)
 	}
@@ -141,9 +145,9 @@ func TestExpireSkipsTerminal(t *testing.T) {
 func TestEvaluations(t *testing.T) {
 	s := openTemp(t)
 	pid := mustDefaultID(t, s)
-	s.UpsertOffers([]api.Offer{sampleOffer("k1", time.Now().Add(24*time.Hour))})
+	s.UpsertOffers(ctx, []api.Offer{sampleOffer("k1", time.Now().Add(24*time.Hour))})
 
-	_, err := s.SaveEvaluation(Evaluation{
+	_, err := s.SaveEvaluation(ctx, Evaluation{
 		OfferKey:   "k1",
 		ProfileID:  pid,
 		Grade:      "B",
@@ -153,7 +157,7 @@ func TestEvaluations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := s.LatestEvaluation("k1", pid)
+	got, err := s.LatestEvaluation(ctx, "k1", pid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,8 +166,8 @@ func TestEvaluations(t *testing.T) {
 	}
 
 	// Grade should surface in the tracker listing.
-	s.AddTracked("k1", pid)
-	items, _ := s.ListTracked(pid, "")
+	s.AddTracked(ctx, "k1", pid)
+	items, _ := s.ListTracked(ctx, pid, "")
 	if items[0].Grade != "B" {
 		t.Errorf("tracker grade = %q, want B", items[0].Grade)
 	}
@@ -173,35 +177,35 @@ func TestSeenDiffing(t *testing.T) {
 	s := openTemp(t)
 	keys := []string{"a", "b", "c"}
 
-	added, err := s.MarkSeen(keys)
+	added, err := s.MarkSeen(ctx, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if added != 3 {
 		t.Errorf("first MarkSeen added %d, want 3", added)
 	}
-	added, _ = s.MarkSeen(append(keys, "d"))
+	added, _ = s.MarkSeen(ctx, append(keys, "d"))
 	if added != 1 {
 		t.Errorf("second MarkSeen added %d, want 1 (only d is new)", added)
 	}
-	if ok, _ := s.IsSeen("a"); !ok {
+	if ok, _ := s.IsSeen(ctx, "a"); !ok {
 		t.Error("a should be seen")
 	}
-	if ok, _ := s.IsSeen("z"); ok {
+	if ok, _ := s.IsSeen(ctx, "z"); ok {
 		t.Error("z should not be seen")
 	}
 }
 
 func TestWatches(t *testing.T) {
 	s := openTemp(t)
-	if _, err := s.AddWatch("go-roles", "IT", `{"searchTerms":["golang"]}`); err != nil {
+	if _, err := s.AddWatch(ctx, "go-roles", "IT", `{"searchTerms":["golang"]}`); err != nil {
 		t.Fatal(err)
 	}
 	// Replace by name.
-	if _, err := s.AddWatch("go-roles", "IT", `{"minimumSalary":25000}`); err != nil {
+	if _, err := s.AddWatch(ctx, "go-roles", "IT", `{"minimumSalary":25000}`); err != nil {
 		t.Fatal(err)
 	}
-	ws, _ := s.ListWatches()
+	ws, _ := s.ListWatches(ctx)
 	if len(ws) != 1 {
 		t.Fatalf("expected 1 watch after replace, got %d", len(ws))
 	}
@@ -212,19 +216,19 @@ func TestWatches(t *testing.T) {
 
 func TestProfiles(t *testing.T) {
 	s := openTemp(t)
-	p, err := s.AddProfile("devops", "content here", true)
+	p, err := s.AddProfile(ctx, "devops", "content here", true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !p.IsDefault {
 		t.Error("new profile should be default")
 	}
-	def, _ := s.DefaultProfile()
+	def, _ := s.DefaultProfile(ctx)
 	if def.Name != "devops" {
 		t.Errorf("default profile = %q, want devops", def.Name)
 	}
 	// The seeded 'default' profile should no longer be the default.
-	old, _ := s.GetProfileByName(DefaultProfileName)
+	old, _ := s.GetProfileByName(ctx, DefaultProfileName)
 	if old.IsDefault {
 		t.Error("old default should have been cleared")
 	}
@@ -232,7 +236,7 @@ func TestProfiles(t *testing.T) {
 
 func mustDefaultID(t *testing.T, s *Store) int64 {
 	t.Helper()
-	p, err := s.DefaultProfile()
+	p, err := s.DefaultProfile(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

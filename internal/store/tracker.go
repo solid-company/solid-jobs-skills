@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -47,8 +48,8 @@ type TrackedOffer struct {
 
 // AddTracked starts tracking an offer for a profile (idempotent: keeps existing
 // status if already tracked). The offer must already be cached.
-func (s *Store) AddTracked(offerKey string, profileID int64) error {
-	ok, err := s.OfferExists(offerKey)
+func (s *Store) AddTracked(ctx context.Context, offerKey string, profileID int64) error {
+	ok, err := s.OfferExists(ctx, offerKey)
 	if err != nil {
 		return err
 	}
@@ -56,18 +57,18 @@ func (s *Store) AddTracked(offerKey string, profileID int64) error {
 		return fmt.Errorf("%w: offer %q not in cache (search for it first)", ErrNotFound, offerKey)
 	}
 	ts := now()
-	return s.q.InsertTracked(bg(), sqlcgen.InsertTrackedParams{
+	return s.q.InsertTracked(ctx, sqlcgen.InsertTrackedParams{
 		OfferKey: offerKey, ProfileID: profileID, Status: StatusSaved,
 		CreatedAt: ts, UpdatedAt: ts,
 	})
 }
 
 // SetStatus updates the status of a tracked offer.
-func (s *Store) SetStatus(offerKey string, profileID int64, status string) error {
+func (s *Store) SetStatus(ctx context.Context, offerKey string, profileID int64, status string) error {
 	if !ValidStatus(status) {
 		return fmt.Errorf("invalid status %q", status)
 	}
-	n, err := s.q.SetStatus(bg(), sqlcgen.SetStatusParams{
+	n, err := s.q.SetStatus(ctx, sqlcgen.SetStatusParams{
 		Status: status, UpdatedAt: now(), OfferKey: offerKey, ProfileID: profileID,
 	})
 	if err != nil {
@@ -80,8 +81,8 @@ func (s *Store) SetStatus(offerKey string, profileID int64, status string) error
 }
 
 // SetNotes replaces the notes on a tracked offer.
-func (s *Store) SetNotes(offerKey string, profileID int64, notes string) error {
-	n, err := s.q.SetNotes(bg(), sqlcgen.SetNotesParams{
+func (s *Store) SetNotes(ctx context.Context, offerKey string, profileID int64, notes string) error {
+	n, err := s.q.SetNotes(ctx, sqlcgen.SetNotesParams{
 		Notes: notes, UpdatedAt: now(), OfferKey: offerKey, ProfileID: profileID,
 	})
 	if err != nil {
@@ -94,8 +95,8 @@ func (s *Store) SetNotes(offerKey string, profileID int64, notes string) error {
 }
 
 // RemoveTracked stops tracking an offer for a profile.
-func (s *Store) RemoveTracked(offerKey string, profileID int64) error {
-	n, err := s.q.RemoveTracked(bg(), sqlcgen.RemoveTrackedParams{
+func (s *Store) RemoveTracked(ctx context.Context, offerKey string, profileID int64) error {
+	n, err := s.q.RemoveTracked(ctx, sqlcgen.RemoveTrackedParams{
 		OfferKey: offerKey, ProfileID: profileID,
 	})
 	if err != nil {
@@ -110,8 +111,8 @@ func (s *Store) RemoveTracked(offerKey string, profileID int64) error {
 // ExpireStale marks tracked offers as expired when their valid_to has passed,
 // except those already in a terminal state (offer/rejected). Returns the count
 // updated. Call before listing so the pipeline reflects reality.
-func (s *Store) ExpireStale(profileID int64) (int64, error) {
-	return s.q.ExpireStale(bg(), sqlcgen.ExpireStaleParams{
+func (s *Store) ExpireStale(ctx context.Context, profileID int64) (int64, error) {
+	return s.q.ExpireStale(ctx, sqlcgen.ExpireStaleParams{
 		UpdatedAt: now(),
 		ProfileID: profileID,
 		Cutoff:    nullStr(time.Now().UTC().Format(time.RFC3339)),
@@ -120,11 +121,11 @@ func (s *Store) ExpireStale(profileID int64) (int64, error) {
 
 // ListTracked returns tracked offers for a profile, optionally filtered by
 // status, newest first. It expires stale rows first.
-func (s *Store) ListTracked(profileID int64, status string) ([]TrackedOffer, error) {
-	if _, err := s.ExpireStale(profileID); err != nil {
+func (s *Store) ListTracked(ctx context.Context, profileID int64, status string) ([]TrackedOffer, error) {
+	if _, err := s.ExpireStale(ctx, profileID); err != nil {
 		return nil, err
 	}
-	rows, err := s.q.ListTracked(bg(), sqlcgen.ListTrackedParams{
+	rows, err := s.q.ListTracked(ctx, sqlcgen.ListTrackedParams{
 		ProfileID: profileID,
 		Status:    nullStr(status),
 	})
@@ -151,8 +152,8 @@ func (s *Store) ListTracked(profileID int64, status string) ([]TrackedOffer, err
 }
 
 // GetTracked returns one tracker row.
-func (s *Store) GetTracked(offerKey string, profileID int64) (*TrackedOffer, error) {
-	r, err := s.q.GetTracked(bg(), sqlcgen.GetTrackedParams{
+func (s *Store) GetTracked(ctx context.Context, offerKey string, profileID int64) (*TrackedOffer, error) {
+	r, err := s.q.GetTracked(ctx, sqlcgen.GetTrackedParams{
 		OfferKey: offerKey, ProfileID: profileID,
 	})
 	if errors.Is(err, sql.ErrNoRows) {

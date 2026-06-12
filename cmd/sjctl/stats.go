@@ -24,7 +24,7 @@ func newStatsCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f := stats.Filter{Division: division, Skill: skill, City: city, Remote: remote}
 			return withService(func(s *jobs.Service) error {
-				res, err := s.SalaryStats(f)
+				res, err := s.SalaryStats(cmd.Context(), f)
 				if err != nil {
 					return fail("stats", err)
 				}

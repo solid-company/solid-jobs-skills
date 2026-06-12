@@ -6,8 +6,8 @@
 -- name: UpsertOffer :exec
 INSERT INTO offers (offer_key, title, company, division, category, sub_category,
     experience_level, salary_from, salary_to, currency, is_remote, is_hybrid,
-    valid_from, valid_to, url, raw, fetched_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    valid_from, valid_to, url, locations, skills, raw, fetched_at)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(offer_key) DO UPDATE SET
     title=excluded.title, company=excluded.company, division=excluded.division,
     category=excluded.category, sub_category=excluded.sub_category,
@@ -15,7 +15,8 @@ ON CONFLICT(offer_key) DO UPDATE SET
     salary_to=excluded.salary_to, currency=excluded.currency,
     is_remote=excluded.is_remote, is_hybrid=excluded.is_hybrid,
     valid_from=excluded.valid_from, valid_to=excluded.valid_to,
-    url=excluded.url, raw=excluded.raw, fetched_at=excluded.fetched_at;
+    url=excluded.url, locations=excluded.locations, skills=excluded.skills,
+    raw=excluded.raw, fetched_at=excluded.fetched_at;
 
 -- name: GetOfferRaw :one
 SELECT raw FROM offers WHERE offer_key = ?;
@@ -28,8 +29,12 @@ SELECT salary_from, salary_to, currency, is_remote, experience_level, division
 FROM offers
 WHERE (CAST(sqlc.narg('division') AS TEXT) IS NULL OR division = sqlc.narg('division'))
   AND (CAST(sqlc.narg('remote') AS INTEGER) IS NULL OR is_remote = sqlc.narg('remote'))
-  AND (CAST(sqlc.narg('skill') AS TEXT) IS NULL OR raw LIKE sqlc.narg('skill') OR title LIKE sqlc.narg('skill'))
-  AND (CAST(sqlc.narg('city') AS TEXT) IS NULL OR raw LIKE sqlc.narg('city'));
+  AND (CAST(sqlc.narg('skill') AS TEXT) IS NULL
+       OR title LIKE sqlc.narg('skill')
+       OR category LIKE sqlc.narg('skill')
+       OR sub_category LIKE sqlc.narg('skill')
+       OR skills LIKE sqlc.narg('skill'))
+  AND (CAST(sqlc.narg('city') AS TEXT) IS NULL OR locations LIKE sqlc.narg('city'));
 
 -- ===== profiles =====
 
@@ -154,3 +159,6 @@ ON CONFLICT(offer_key) DO NOTHING;
 
 -- name: IsSeen :one
 SELECT EXISTS(SELECT 1 FROM seen WHERE offer_key = ?);
+
+-- name: SeenKeys :many
+SELECT offer_key FROM seen WHERE offer_key IN (sqlc.slice('keys'));

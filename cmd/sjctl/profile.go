@@ -46,7 +46,7 @@ func newProfileAddCmd() *cobra.Command {
 				content = string(b)
 			}
 			return withService(func(s *jobs.Service) error {
-				p, err := s.Store.AddProfile(args[0], content, makeDflt)
+				p, err := s.Store.AddProfile(cmd.Context(), args[0], content, makeDflt)
 				if err != nil {
 					return fail("profile add", err)
 				}
@@ -66,7 +66,7 @@ func newProfileListCmd() *cobra.Command {
 		Short: "List profiles",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withService(func(s *jobs.Service) error {
-				ps, err := s.Store.ListProfiles()
+				ps, err := s.Store.ListProfiles(cmd.Context())
 				if err != nil {
 					return fail("profile list", err)
 				}
@@ -105,9 +105,9 @@ func newProfileShowCmd() *cobra.Command {
 				var p *store.Profile
 				var err error
 				if name == "" {
-					p, err = s.Store.DefaultProfile()
+					p, err = s.Store.DefaultProfile(cmd.Context())
 				} else {
-					p, err = s.Store.GetProfileByName(name)
+					p, err = s.Store.GetProfileByName(cmd.Context(), name)
 				}
 				if err != nil {
 					return fail("profile show", err)
@@ -133,11 +133,11 @@ func newProfileImportCmd() *cobra.Command {
 				return fail("read file", err)
 			}
 			return withService(func(s *jobs.Service) error {
-				p, err := s.Store.GetProfileByName(args[0])
+				p, err := s.Store.GetProfileByName(cmd.Context(), args[0])
 				if err != nil {
 					return fail("profile import", err)
 				}
-				if err := s.Store.SetProfileContent(p.ID, string(b)); err != nil {
+				if err := s.Store.SetProfileContent(cmd.Context(), p.ID, string(b)); err != nil {
 					return fail("profile import", err)
 				}
 				fmt.Printf("imported %d chars into %q\n", len(b), args[0])
@@ -154,11 +154,11 @@ func newProfileSetDefaultCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withService(func(s *jobs.Service) error {
-				p, err := s.Store.GetProfileByName(args[0])
+				p, err := s.Store.GetProfileByName(cmd.Context(), args[0])
 				if err != nil {
 					return fail("set-default", err)
 				}
-				if err := s.Store.SetDefaultProfile(p.ID); err != nil {
+				if err := s.Store.SetDefaultProfile(cmd.Context(), p.ID); err != nil {
 					return fail("set-default", err)
 				}
 				fmt.Printf("default profile is now %q\n", args[0])
