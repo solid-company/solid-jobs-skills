@@ -38,7 +38,9 @@ if ($target -eq "latest") {
 # --- skip if already at target -----------------------------------------------
 if (Test-Path $binPath) {
   $current = (& $binPath version 2>$null)
-  if ($current -eq $tag) { Write-Output $binPath; exit 0 }
+  # `sjctl version` prints main.version, stamped from GoReleaser's {{ .Version }}
+  # which strips the leading v (0.1.0), so compare against the tag without it.
+  if ($current -eq ($tag -replace '^v','')) { Write-Output $binPath; exit 0 }
 }
 
 # --- download, verify, extract ----------------------------------------------

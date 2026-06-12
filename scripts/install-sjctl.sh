@@ -54,7 +54,9 @@ bin_path="${BIN_DIR}/sjctl"
 # --- skip if already installed at the target version -------------------------
 if [ -x "$bin_path" ]; then
   current="$("$bin_path" version 2>/dev/null || true)"
-  if [ "$current" = "$tag" ]; then
+  # `sjctl version` prints main.version, stamped from GoReleaser's {{ .Version }}
+  # which strips the leading v (0.1.0), so compare against the tag without it.
+  if [ "$current" = "${tag#v}" ]; then
     echo "$bin_path"
     exit 0
   fi
