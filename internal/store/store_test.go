@@ -196,6 +196,75 @@ func TestSeenDiffing(t *testing.T) {
 	}
 }
 
+func TestSeenKeys(t *testing.T) {
+	s := openTemp(t)
+	if _, err := s.MarkSeen(ctx, []string{"a", "b", "c"}); err != nil {
+		t.Fatal(err)
+	}
+
+	seen, err := s.SeenKeys(ctx, []string{"a", "c", "x", "y"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !seen["a"] || !seen["c"] {
+		t.Errorf("a and c should be reported seen: %v", seen)
+	}
+	if seen["x"] || seen["y"] {
+		t.Errorf("x and y should not be seen: %v", seen)
+	}
+	if len(seen) != 2 {
+		t.Errorf("expected only the 2 known keys, got %d", len(seen))
+	}
+
+	// Empty input is a no-op (no query), not an error.
+	empty, err := s.SeenKeys(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(empty) != 0 {
+		t.Errorf("empty input should yield empty set, got %v", empty)
+	}
+}
+
+func TestValidGrade(t *testing.T) {
+	for _, g := range []string{"A", "B", "C", "D", "E", "F"} {
+		if !ValidGrade(g) {
+			t.Errorf("%q should be valid", g)
+		}
+	}
+	for _, g := range []string{"", "G", "a", "A+", "1"} {
+		if ValidGrade(g) {
+			t.Errorf("%q should be invalid", g)
+		}
+	}
+}
+
+func TestMigrateIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "migrate.db")
+
+	// First open creates and migrates the schema.
+	s1, err := Open(path)
+	if err != nil {
+		t.Fatalf("first open: %v", err)
+	}
+	if err := s1.UpsertOffers(ctx, []api.Offer{sampleOffer("k1", time.Now().Add(24*time.Hour))}); err != nil {
+		t.Fatal(err)
+	}
+	s1.Close()
+
+	// Re-opening runs migrate() again over the existing table; the duplicate
+	// ADD COLUMN must be swallowed, not fail.
+	s2, err := Open(path)
+	if err != nil {
+		t.Fatalf("reopen (migrate should be idempotent): %v", err)
+	}
+	defer s2.Close()
+	if got, err := s2.GetOffer(ctx, "k1"); err != nil || got.Title == "" {
+		t.Errorf("offer not readable after reopen: %+v err=%v", got, err)
+	}
+}
+
 func TestWatches(t *testing.T) {
 	s := openTemp(t)
 	if _, err := s.AddWatch(ctx, "go-roles", "IT", `{"searchTerms":["golang"]}`); err != nil {
