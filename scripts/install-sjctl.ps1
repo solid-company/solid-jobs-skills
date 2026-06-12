@@ -22,7 +22,9 @@ $binPath = Join-Path $binDir "sjctl.exe"
 # --- detect arch -------------------------------------------------------------
 $arch = switch ($env:PROCESSOR_ARCHITECTURE) {
   "AMD64" { "amd64" }
-  "ARM64" { "arm64" }  # no windows/arm64 release is built; will fail resolve below
+  # No windows/arm64 release is built; Windows on ARM runs the amd64 binary
+  # under x64 emulation, so map to amd64 rather than 404 on a missing asset.
+  "ARM64" { "amd64" }
   default { throw "install-sjctl: unsupported arch $($env:PROCESSOR_ARCHITECTURE)" }
 }
 
