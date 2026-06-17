@@ -1,6 +1,7 @@
 # solid-jobs-skills
 
 [![Available on skills.sh](https://img.shields.io/badge/skills.sh-solid--jobs--skills-6f42c1)](https://skills.sh/solid-company/solid-jobs-skills)
+[![Downloads](https://img.shields.io/github/downloads/solid-company/solid-jobs-skills/total)](https://github.com/solid-company/solid-jobs-skills/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 AI job-search command center for the [SOLID.Jobs](https://solid.jobs) public API.
