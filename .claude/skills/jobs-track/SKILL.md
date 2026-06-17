@@ -37,7 +37,16 @@ All commands act on the default profile unless `--profile <name>` is given.
 ## Flow
 
 1. For "track this" / "I applied", resolve the offer key and run the matching command.
-2. For "where am I" / "show my pipeline", run `track list --json`, then group by status and present a compact board (key, status, grade, title, company). The grade column comes from the latest evaluation.
+2. For "where am I" / "show my pipeline", run `track list --json`, then group by
+   status and present a compact board as a **markdown table** with a clickable
+   title. Each tracked row carries a `url`; make the title link to it:
+
+   | Offer | Company | Status | Grade | Key |
+   |-------|---------|--------|-------|-----|
+   | [Senior Go Engineer](https://solid.jobs/…) | Acme | applied | B | `abc123` |
+
+   The grade column comes from the latest evaluation; fall back to the plain title
+   if `url` is empty.
 3. `list` auto-expires stale offers first, so the board always reflects which offers are still open.
 
 ## Notes

@@ -25,7 +25,16 @@ sjctl watch add my-go-roles -d IT --term golang --remote --min-salary 20000
 1. `sjctl sync --json` — runs every watch, caches results, returns only offers not previously reported (the `new` array). A second run returns nothing until genuinely new offers appear.
 2. If `new` is empty, tell the user there's nothing new and stop.
 3. Otherwise, load the profile (`sjctl profile show --json`) and quickly rank the new offers by fit using the same dimensions as `/jobs-evaluate` (skill match, salary, seniority, work mode). Don't over-analyze — this is a triage pass.
-4. Present a short digest: for each strong new offer, one line with title, company, salary, work mode, and why it fits, plus the `jobOfferKey`.
+4. Present a short digest as a **markdown table** the user can click through. Make
+   the title a link to each offer's `url` field, and add a short "why it fits" plus
+   the `jobOfferKey`:
+
+   | Offer | Company | Salary | Mode | Why it fits | Key |
+   |-------|---------|--------|------|-------------|-----|
+   | [Backend Engineer](https://solid.jobs/…) | Acme | 18000+ PLN | remote | Strong Go + salary at target | `abc123` |
+
+   The `url` is on each offer in the `sync --json` `new` array; fall back to the
+   plain title if it's empty.
 5. Offer to track the best ones (`/jobs-track`) or do a full evaluation (`/jobs-evaluate`).
 
 ## Notes

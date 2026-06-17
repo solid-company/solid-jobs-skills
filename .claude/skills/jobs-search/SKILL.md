@@ -44,7 +44,16 @@ Divisions and experience levels are case-sensitive (e.g. `Senior`, not `senior`)
 
 1. Parse the request into flags. If the division is ambiguous, default to IT and say so.
 2. Run e.g. `sjctl search -d IT --term golang --remote --min-salary 20000 --page-size 30 --json`.
-3. Summarize the top matches: title, company, salary, work mode, location, and the `jobOfferKey` (needed for tracking/evaluating).
+3. Present the top matches as a **markdown table** so the user can click straight
+   through to each posting. Make the title a link to the offer's `url` field, and
+   keep one column for the `jobOfferKey` (needed for tracking/evaluating):
+
+   | Offer | Company | Salary | Mode | Location | Key |
+   |-------|---------|--------|------|----------|-----|
+   | [Senior Go Engineer](https://solid.jobs/…) | Acme | 22000–28000 PLN | remote | Warsaw | `abc123` |
+
+   Build the link from each offer's `url` in the `--json` output; if `url` is empty,
+   show the plain title. Below the table, add a one-line read on the strongest matches.
 4. Offer next steps: track an offer (`/jobs-track`) or evaluate fit (`/jobs-evaluate`).
 
 Searching caches offers locally, so the keys you show can be tracked or evaluated immediately without re-querying.
