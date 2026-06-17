@@ -17,7 +17,7 @@ Resolve `sjctl` in this order: (1) on `PATH`, (2) `~/.solid-jobs-skills/bin/sjct
 Digest is driven by saved searches. If none exist (`sjctl watch list --json` is empty), help the user create one from their typical criteria:
 
 ```
-sjctl watch add my-go-roles -d IT --term golang --remote --min-salary 20000
+sjctl watch add my-go-roles -d IT --term golang --min-salary 20000
 ```
 
 ## Flow
