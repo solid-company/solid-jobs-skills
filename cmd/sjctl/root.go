@@ -28,6 +28,16 @@ func newRootCmd() *cobra.Command {
 		Short:         "SOLID.Jobs search, tracking and evaluation engine",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		// Keep an installed sjctl current without a manual reinstall: check for a
+		// newer release at most once a day and self-update in the background. The
+		// version and update commands opt out so they never trigger a check.
+		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
+			switch cmd.Name() {
+			case "version", "update", "help":
+				return
+			}
+			maybeAutoUpdate()
+		},
 	}
 	pf := root.PersistentFlags()
 	pf.StringVar(&gf.dbPath, "db", defaultDBPath(), "path to SQLite database")
@@ -44,6 +54,7 @@ func newRootCmd() *cobra.Command {
 		newWatchCmd(),
 		newEvaluateCmd(),
 		newVersionCmd(),
+		newUpdateCmd(),
 	)
 	return root
 }
