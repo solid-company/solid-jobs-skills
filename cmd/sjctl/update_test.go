@@ -8,8 +8,31 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"testing"
 )
+
+// TestVerifyReleaseSignaturePolicy covers the cosign-absent branch: with no
+// cosign on PATH, the automatic path (require=true) must refuse the update while
+// the explicit path (require=false) proceeds, and SJCTL_SKIP_COSIGN bypasses
+// both. cosign verification itself is exercised by the installer's own tests.
+func TestVerifyReleaseSignaturePolicy(t *testing.T) {
+	// Empty PATH so exec.LookPath("cosign") fails deterministically.
+	t.Setenv("PATH", t.TempDir())
+
+	t.Setenv("SJCTL_SKIP_COSIGN", "")
+	if err := verifyReleaseSignature(io.Discard, "base", "repo", nil, true); err == nil {
+		t.Fatal("auto path (require=true) must refuse when cosign is absent")
+	}
+	if err := verifyReleaseSignature(io.Discard, "base", "repo", nil, false); err != nil {
+		t.Fatalf("explicit path (require=false) should proceed when cosign is absent: %v", err)
+	}
+
+	t.Setenv("SJCTL_SKIP_COSIGN", "1")
+	if err := verifyReleaseSignature(io.Discard, "base", "repo", nil, true); err != nil {
+		t.Fatalf("SJCTL_SKIP_COSIGN=1 must bypass even on the auto path: %v", err)
+	}
+}
 
 func TestVerifyChecksum(t *testing.T) {
 	archive := []byte("pretend binary archive")
