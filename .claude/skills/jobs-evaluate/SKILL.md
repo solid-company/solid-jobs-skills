@@ -13,8 +13,8 @@ Judge how well a cached offer fits the user's profile, give a graded verdict, an
 2. The profile — `sjctl profile show --json` (the default profile, or pass `--profile <name>`).
 
 Resolve `sjctl` in this order: (1) on `PATH`, (2) `~/.solid-jobs-skills/bin/sjctl[.exe]`, (3) `./sjctl[.exe]` in the repo. If none exist, install it and use the printed path:
-- macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/solid-company/solid-jobs-skills/main/scripts/install-sjctl.sh | bash`
-- Windows: `irm https://raw.githubusercontent.com/solid-company/solid-jobs-skills/main/scripts/install-sjctl.ps1 | iex`
+- macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/solid-company/solid-jobs-skills/v0.2.0/scripts/install-sjctl.sh | bash`
+- Windows: `irm https://raw.githubusercontent.com/solid-company/solid-jobs-skills/v0.2.0/scripts/install-sjctl.ps1 | iex`
 - Dev fallback (Go, inside repo): `go run ./cmd/sjctl`
 
 ## Rubric
