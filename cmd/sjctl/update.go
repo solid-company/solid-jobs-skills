@@ -28,13 +28,21 @@ import (
 // installer on first install; here the asset is pulled over HTTPS from the
 // release and matched to the release's own checksums.txt.
 
-// updateRepo is the GitHub owner/repo releases are pulled from. SJCTL_REPO
-// overrides it to keep parity with the installer scripts.
+// canonicalRepo is the trusted GitHub owner/repo releases are pulled from. The
+// automatic updater is pinned to this and never honors SJCTL_REPO: a daily,
+// background self-update that downloads and runs a binary from an env-var-chosen
+// repo would let anything that can set an env var in the session gain persistent
+// code execution on the next sjctl run.
+const canonicalRepo = "solid-company/solid-jobs-skills"
+
+// updateRepo is the repo the *explicit* `sjctl update` pulls from. SJCTL_REPO
+// overrides it to keep parity with the installer scripts — that override is an
+// explicit, interactive user action, unlike the automatic path.
 func updateRepo() string {
 	if v := os.Getenv("SJCTL_REPO"); v != "" {
 		return v
 	}
-	return "solid-company/solid-jobs-skills"
+	return canonicalRepo
 }
 
 func newUpdateCmd() *cobra.Command {
@@ -44,7 +52,7 @@ func newUpdateCmd() *cobra.Command {
 		Short: "Update sjctl to the latest release",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return selfUpdate(cmd.OutOrStdout(), force)
+			return selfUpdate(cmd.OutOrStdout(), updateRepo(), force)
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "reinstall even if already on the latest version")
@@ -104,12 +112,11 @@ func assetName() string {
 
 // selfUpdate resolves the latest release and, unless already current, downloads,
 // verifies and installs it over the running binary.
-func selfUpdate(out io.Writer, force bool) error {
+func selfUpdate(out io.Writer, repo string, force bool) error {
 	if version == "dev" && !force {
 		return fmt.Errorf("this is a dev build; refusing to self-update (use --force to override)")
 	}
 
-	repo := updateRepo()
 	tag, err := latestReleaseTag(repo)
 	if err != nil {
 		return fail("resolve latest release", err)
@@ -272,13 +279,13 @@ func maybeAutoUpdate() {
 	}
 	touchStamp(stamp) // record the attempt up front so a hang can't loop
 
-	repo := updateRepo()
-	tag, err := latestReleaseTag(repo)
+	// Always the canonical repo here — never SJCTL_REPO. See canonicalRepo.
+	tag, err := latestReleaseTag(canonicalRepo)
 	if err != nil || version == strings.TrimPrefix(tag, "v") {
 		return
 	}
 	var buf bytes.Buffer
-	if err := selfUpdate(&buf, false); err != nil {
+	if err := selfUpdate(&buf, canonicalRepo, false); err != nil {
 		fmt.Fprintln(os.Stderr, "sjctl: auto-update failed:", err)
 		return
 	}
