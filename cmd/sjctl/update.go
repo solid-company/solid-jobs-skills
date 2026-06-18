@@ -347,6 +347,7 @@ func replaceRunningBinary(binData []byte) error {
 		}
 		if err := os.Rename(staged, exe); err != nil {
 			os.Rename(old, exe) // best-effort rollback
+			os.Remove(staged)   // don't leave .sjctl.new behind
 			return err
 		}
 		_ = os.Remove(old) // usually fails while running; cleaned up next time
