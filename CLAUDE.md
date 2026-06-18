@@ -68,11 +68,34 @@ folders — not the Go source. So the binary is delivered separately:
   needs `id-token: write` for OIDC.
 - **Version:** `main.version` is stamped via `-ldflags "-X main.version=..."`;
   `sjctl version` prints it, and the installer uses it to skip re-downloads.
+- **Self-update:** once installed, `sjctl` keeps itself current without re-running
+  the bootstrap. A daily-cached check (`cmd/sjctl/update.go`) resolves the latest
+  release, downloads the os/arch archive, verifies the keyless **cosign**
+  signature over `checksums.txt` and then the archive's sha256 against it, and
+  atomically swaps the running binary (effective next run) — the same trust chain
+  the installer uses, since first-install cosign does not cover later updates.
+  Runs on every command via the root `PersistentPreRun` (skips `version`/`update`/
+  `help`); `sjctl update [--force]` triggers it on demand. The cosign-absent
+  policy differs by path: the explicit `sjctl update` warns and proceeds (user is
+  present), but the unattended auto-update **aborts** rather than install
+  unverified code; `SJCTL_SKIP_COSIGN=1` bypasses both. The auto-updater is pinned
+  to the canonical repo and ignores `SJCTL_REPO` (honored only by explicit
+  `update`). `dev` builds never self-update; `SJCTL_NO_AUTO_UPDATE=1` disables the
+  auto-check. This is why a new tag reaches existing users without a manual
+  reinstall — the skill's `curl|bash` bootstrap only fires when the binary is
+  missing. The bootstrap script URL in the skills is pinned to a release tag (not
+  `main`) so it is immutable.
 - **DB location:** `defaultDBPath()` resolves `SJCTL_DB` → `~/.solid-jobs-skills/solidjobs.db`,
   so the binary works from any working directory once installed.
 
 To cut a release: tag `vX.Y.Z` and push; the workflow runs GoReleaser. Test
-locally with `goreleaser release --snapshot --clean`.
+locally with `goreleaser release --snapshot --clean`. The pinned bootstrap URL is
+a maintenance tripwire — the tag it points at must exist and contain
+`scripts/install-sjctl.{sh,ps1}` or all five skills 404 on first install, and the
+pin must be bumped in every skill on each release or it goes stale (the script
+still resolves "latest" for the binary, but it is fetched from the pinned tag).
+Release checklist: after tagging, bump the `.../<tag>/scripts/install-sjctl.*`
+URLs in all five `.claude/skills/*/SKILL.md` to the new tag.
 
 ## sjctl command map
 
@@ -85,6 +108,7 @@ locally with `goreleaser release --snapshot --clean`.
 | `watch add/list/rm` | Saved searches for sync |
 | `sync` | Run watches, report offers not seen before |
 | `stats` | Salary min/median/max, remote share, counts over cached offers |
+| `update` | Self-update to the latest release (verified); runs automatically once/day |
 
 Global flags: `--db`, `--campaign`, `--json`, `--profile`.
 
