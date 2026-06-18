@@ -360,6 +360,22 @@ func replaceRunningBinary(binData []byte) error {
 	return os.Chmod(exe, 0o755)
 }
 
+// autoUpdateExempt reports whether the command named name should NOT trigger an
+// auto-update check. Beyond the obvious update-related commands, this must cover
+// Cobra's internal commands: completion scripts (`completion`) and especially the
+// hidden `__complete`/`__completeNoDesc` shell-completion handlers, which inherit
+// root's PersistentPreRun. Without exempting those, every first TAB-completion of
+// the day on a real install would fire the check and could block the interactive
+// shell while a release downloads.
+func autoUpdateExempt(name string) bool {
+	switch name {
+	case "version", "update", "help", "completion",
+		cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+		return true
+	}
+	return false
+}
+
 // maybeAutoUpdate runs at most once per day: it checks for a newer release and,
 // if found, installs it. The update takes effect on the next invocation, so the
 // current command continues on the running binary. Best-effort — any failure is

@@ -36,8 +36,7 @@ func newRootCmd() *cobra.Command {
 		// only takes effect on the next invocation). The version and update
 		// commands opt out so they never trigger a check.
 		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
-			switch cmd.Name() {
-			case "version", "update", "help":
+			if autoUpdateExempt(cmd.Name()) {
 				return
 			}
 			maybeAutoUpdate()

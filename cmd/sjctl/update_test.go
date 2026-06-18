@@ -10,7 +10,29 @@ import (
 	"fmt"
 	"io"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
+
+// TestAutoUpdateExempt locks in the set of commands that must NOT trigger an
+// auto-update check — in particular Cobra's hidden completion handler, which
+// inherits root's PersistentPreRun (see autoUpdateExempt).
+func TestAutoUpdateExempt(t *testing.T) {
+	exempt := []string{
+		"version", "update", "help", "completion",
+		cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd,
+	}
+	for _, name := range exempt {
+		if !autoUpdateExempt(name) {
+			t.Errorf("%q must be exempt from auto-update", name)
+		}
+	}
+	for _, name := range []string{"search", "sync", "track", "evaluate", "stats", "profile", "watch"} {
+		if autoUpdateExempt(name) {
+			t.Errorf("%q is a real command and must NOT be exempt", name)
+		}
+	}
+}
 
 // TestVerifyReleaseSignaturePolicy covers the cosign-absent branch: with no
 // cosign on PATH, the automatic path (require=true) must refuse the update while
