@@ -9,7 +9,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -31,6 +34,30 @@ func TestAutoUpdateExempt(t *testing.T) {
 		if autoUpdateExempt(name) {
 			t.Errorf("%q is a real command and must NOT be exempt", name)
 		}
+	}
+}
+
+// TestRecentlyChecked covers the once-per-day gate: absent stamp means never
+// checked, a fresh stamp gates further checks, and a stamp older than 24h reopens
+// the window. touchStamp must produce a stamp that reads as recent.
+func TestRecentlyChecked(t *testing.T) {
+	stamp := filepath.Join(t.TempDir(), "sub", ".update-check")
+
+	if recentlyChecked(stamp) {
+		t.Fatal("absent stamp must not count as recently checked")
+	}
+
+	touchStamp(stamp) // also exercises the MkdirAll of a missing parent
+	if !recentlyChecked(stamp) {
+		t.Fatal("just-touched stamp must count as recently checked")
+	}
+
+	old := time.Now().Add(-25 * time.Hour)
+	if err := os.Chtimes(stamp, old, old); err != nil {
+		t.Fatal(err)
+	}
+	if recentlyChecked(stamp) {
+		t.Fatal("stamp older than 24h must reopen the check window")
 	}
 }
 
