@@ -110,7 +110,10 @@ func latestReleaseTag(repo string) (string, error) {
 }
 
 // assetName is the archive published for this os/arch: tar.gz everywhere except
-// Windows, which ships a zip. Matches .goreleaser.yaml's name_template.
+// Windows, which ships a zip. Matches .goreleaser.yaml's name_template. Note
+// .goreleaser.yaml skips windows/arm64, so on that platform this names an asset
+// that does not exist and the download 404s — harmless, as auto-update treats it
+// as a best-effort failure (the installer has the same gap).
 func assetName() string {
 	ext := "tar.gz"
 	if runtime.GOOS == "windows" {
@@ -140,7 +143,14 @@ func selfUpdate(out io.Writer, repo string, force, requireSignature bool) error 
 		fmt.Fprintf(out, "sjctl is already up to date (%s)\n", version)
 		return nil
 	}
+	return installRelease(out, repo, tag, requireSignature)
+}
 
+// installRelease downloads repo's release tag for this os/arch, verifies it
+// (cosign over checksums.txt, then the asset's sha256) and atomically swaps the
+// running binary. The tag is passed in so the auto path can reuse the one it
+// already resolved instead of re-querying the releases API.
+func installRelease(out io.Writer, repo, tag string, requireSignature bool) error {
 	base := fmt.Sprintf("https://github.com/%s/releases/download/%s", repo, tag)
 	asset := assetName()
 
@@ -366,12 +376,18 @@ func maybeAutoUpdate() {
 	touchStamp(stamp) // record the attempt up front so a hang can't loop
 
 	// Always the canonical repo here — never SJCTL_REPO. See canonicalRepo.
+	// The pre-check failing (network blip, rate limit) returns silently: it's
+	// indistinguishable from "no update available" and not worth a daily line of
+	// noise. Once we know an update exists, a failure mid-install (download,
+	// signature, swap) is surfaced to stderr — that's an actionable problem
+	// (notably a cosign abort), not background noise. installRelease reuses the
+	// tag resolved here rather than querying the releases API a second time.
 	tag, err := latestReleaseTag(canonicalRepo)
 	if err != nil || version == strings.TrimPrefix(tag, "v") {
 		return
 	}
 	var buf bytes.Buffer
-	if err := selfUpdate(&buf, canonicalRepo, false, true); err != nil {
+	if err := installRelease(&buf, canonicalRepo, tag, true); err != nil {
 		fmt.Fprintln(os.Stderr, "sjctl: auto-update failed:", err)
 		return
 	}
