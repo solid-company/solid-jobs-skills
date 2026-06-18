@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -22,11 +23,19 @@ import (
 
 // Self-update keeps an installed sjctl current without re-running the bootstrap
 // installer (which only fires when the binary is missing). It mirrors the
-// install-sjctl scripts: resolve the latest GitHub release, download the asset
-// for this os/arch, verify its sha256 against checksums.txt, then atomically
-// replace the running executable. The cosign signature layer is applied by the
-// installer on first install; here the asset is pulled over HTTPS from the
-// release and matched to the release's own checksums.txt.
+// install-sjctl scripts end to end: resolve the latest GitHub release, download
+// the os/arch asset and checksums.txt, verify the keyless cosign signature over
+// checksums.txt, verify the asset's sha256 against it, then atomically replace
+// the running executable.
+//
+// The cosign step is the actual supply-chain boundary and must run on every
+// update, not just first install: each update fetches a fresh checksums.txt +
+// archive, so a matching sha256 alone is self-referential (whoever serves a
+// malicious archive serves a matching checksums.txt with it). The signature
+// proves checksums.txt came from this repo's release workflow. Cosign at
+// first-install does NOT transitively cover later self-updates. Because
+// auto-update runs unattended and daily, the explicit and automatic paths apply
+// different cosign policies — see verifyReleaseSignature.
 
 // canonicalRepo is the trusted GitHub owner/repo releases are pulled from. The
 // automatic updater is pinned to this and never honors SJCTL_REPO: a daily,
@@ -52,7 +61,7 @@ func newUpdateCmd() *cobra.Command {
 		Short: "Update sjctl to the latest release",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return selfUpdate(cmd.OutOrStdout(), updateRepo(), force)
+			return selfUpdate(cmd.OutOrStdout(), updateRepo(), force, false)
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "reinstall even if already on the latest version")
@@ -111,8 +120,12 @@ func assetName() string {
 }
 
 // selfUpdate resolves the latest release and, unless already current, downloads,
-// verifies and installs it over the running binary.
-func selfUpdate(out io.Writer, repo string, force bool) error {
+// verifies and installs it over the running binary. requireSignature controls
+// the cosign-absent policy (see verifyReleaseSignature): the automatic path sets
+// it so a missing cosign aborts the unattended update rather than installing
+// unverified code; the explicit `sjctl update` leaves it off to match the
+// installer's verify-when-present behavior.
+func selfUpdate(out io.Writer, repo string, force, requireSignature bool) error {
 	if version == "dev" && !force {
 		return fmt.Errorf("this is a dev build; refusing to self-update (use --force to override)")
 	}
@@ -139,6 +152,11 @@ func selfUpdate(out io.Writer, repo string, force bool) error {
 	if err != nil {
 		return fail("download checksums.txt", err)
 	}
+	// cosign first (proves checksums.txt is authentic), then sha256 (proves the
+	// archive matches it) — same order as install-sjctl.sh.
+	if err := verifyReleaseSignature(out, base, repo, sums, requireSignature); err != nil {
+		return fail("verify signature", err)
+	}
 	if err := verifyChecksum(archive, sums, asset); err != nil {
 		return fail("verify "+asset, err)
 	}
@@ -152,6 +170,74 @@ func selfUpdate(out io.Writer, repo string, force bool) error {
 	}
 
 	fmt.Fprintf(out, "updated sjctl to %s\n", tag)
+	return nil
+}
+
+// verifyReleaseSignature gates installation on the keyless cosign signature over
+// checksums.txt, mirroring install-sjctl.sh. SJCTL_SKIP_COSIGN=1 bypasses it
+// (explicit user opt-out). When cosign is not on PATH it cannot verify: the
+// installer warns and proceeds, and the explicit `sjctl update` does the same
+// (require=false) since the user is present to judge. The automatic path passes
+// require=true so an unattended daily update never installs unverified code —
+// it aborts instead, leaving the running binary untouched.
+func verifyReleaseSignature(out io.Writer, base, repo string, sums []byte, require bool) error {
+	if os.Getenv("SJCTL_SKIP_COSIGN") == "1" {
+		fmt.Fprintln(out, "sjctl: skipping cosign verification (SJCTL_SKIP_COSIGN=1)")
+		return nil
+	}
+	if _, err := exec.LookPath("cosign"); err != nil {
+		if require {
+			return fmt.Errorf("cosign not on PATH; refusing to auto-update unverified " +
+				"(install cosign, run `sjctl update` manually, or set SJCTL_SKIP_COSIGN=1)")
+		}
+		fmt.Fprintln(out, "sjctl: cosign not found; skipping signature verification "+
+			"(install cosign or set SJCTL_SKIP_COSIGN=1 to silence)")
+		return nil
+	}
+	return verifyCosign(base, repo, sums)
+}
+
+// verifyCosign runs `cosign verify-blob` over checksums.txt, binding the keyless
+// signature to repo's release workflow identity (the GitHub Actions OIDC issuer),
+// exactly as install-sjctl.sh does.
+func verifyCosign(base, repo string, sums []byte) error {
+	sig, err := httpGet(base + "/checksums.txt.sig")
+	if err != nil {
+		return fmt.Errorf("download checksums.txt.sig: %w", err)
+	}
+	pem, err := httpGet(base + "/checksums.txt.pem")
+	if err != nil {
+		return fmt.Errorf("download checksums.txt.pem: %w", err)
+	}
+
+	dir, err := os.MkdirTemp("", "sjctl-cosign")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+
+	sumsPath := filepath.Join(dir, "checksums.txt")
+	sigPath := filepath.Join(dir, "checksums.txt.sig")
+	pemPath := filepath.Join(dir, "checksums.txt.pem")
+	for _, f := range []struct {
+		path string
+		data []byte
+	}{{sumsPath, sums}, {sigPath, sig}, {pemPath, pem}} {
+		if err := os.WriteFile(f.path, f.data, 0o644); err != nil {
+			return err
+		}
+	}
+
+	cmd := exec.Command("cosign", "verify-blob",
+		"--certificate", pemPath,
+		"--signature", sigPath,
+		"--certificate-identity-regexp", "^https://github.com/"+repo+"/",
+		"--certificate-oidc-issuer", "https://token.actions.githubusercontent.com",
+		sumsPath,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("cosign signature verification failed: %v: %s", err, strings.TrimSpace(string(out)))
+	}
 	return nil
 }
 
@@ -285,7 +371,7 @@ func maybeAutoUpdate() {
 		return
 	}
 	var buf bytes.Buffer
-	if err := selfUpdate(&buf, canonicalRepo, false); err != nil {
+	if err := selfUpdate(&buf, canonicalRepo, false, true); err != nil {
 		fmt.Fprintln(os.Stderr, "sjctl: auto-update failed:", err)
 		return
 	}
