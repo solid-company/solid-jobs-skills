@@ -70,14 +70,21 @@ folders — not the Go source. So the binary is delivered separately:
   `sjctl version` prints it, and the installer uses it to skip re-downloads.
 - **Self-update:** once installed, `sjctl` keeps itself current without re-running
   the bootstrap. A daily-cached check (`cmd/sjctl/update.go`) resolves the latest
-  release, downloads the os/arch archive, verifies its sha256 against
-  `checksums.txt`, and atomically swaps the running binary (effective next run).
+  release, downloads the os/arch archive, verifies the keyless **cosign**
+  signature over `checksums.txt` and then the archive's sha256 against it, and
+  atomically swaps the running binary (effective next run) — the same trust chain
+  the installer uses, since first-install cosign does not cover later updates.
   Runs on every command via the root `PersistentPreRun` (skips `version`/`update`/
-  `help`); `sjctl update [--force]` triggers it on demand. `dev` builds never
-  self-update; `SJCTL_NO_AUTO_UPDATE=1` disables the auto-check. This is why a new
-  tag reaches existing users without a manual reinstall — the skill's `curl|bash`
-  bootstrap only fires when the binary is missing. The bootstrap script URL in the
-  skills is pinned to a release tag (not `main`) so it is immutable.
+  `help`); `sjctl update [--force]` triggers it on demand. The cosign-absent
+  policy differs by path: the explicit `sjctl update` warns and proceeds (user is
+  present), but the unattended auto-update **aborts** rather than install
+  unverified code; `SJCTL_SKIP_COSIGN=1` bypasses both. The auto-updater is pinned
+  to the canonical repo and ignores `SJCTL_REPO` (honored only by explicit
+  `update`). `dev` builds never self-update; `SJCTL_NO_AUTO_UPDATE=1` disables the
+  auto-check. This is why a new tag reaches existing users without a manual
+  reinstall — the skill's `curl|bash` bootstrap only fires when the binary is
+  missing. The bootstrap script URL in the skills is pinned to a release tag (not
+  `main`) so it is immutable.
 - **DB location:** `defaultDBPath()` resolves `SJCTL_DB` → `~/.solid-jobs-skills/solidjobs.db`,
   so the binary works from any working directory once installed.
 
