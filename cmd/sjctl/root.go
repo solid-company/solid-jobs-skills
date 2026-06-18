@@ -28,9 +28,13 @@ func newRootCmd() *cobra.Command {
 		Short:         "SOLID.Jobs search, tracking and evaluation engine",
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		// Keep an installed sjctl current without a manual reinstall: check for a
-		// newer release at most once a day and self-update in the background. The
-		// version and update commands opt out so they never trigger a check.
+		// Keep an installed sjctl current without a manual reinstall: at most once
+		// a day, check for a newer release and, if one exists, download and install
+		// it. This runs synchronously before the command — the once-a-day gate
+		// makes the common case a single cheap API call, but the run that actually
+		// finds an update blocks while the new binary downloads (the update itself
+		// only takes effect on the next invocation). The version and update
+		// commands opt out so they never trigger a check.
 		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 			switch cmd.Name() {
 			case "version", "update", "help":
