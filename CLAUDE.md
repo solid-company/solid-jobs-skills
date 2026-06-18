@@ -89,7 +89,13 @@ folders — not the Go source. So the binary is delivered separately:
   so the binary works from any working directory once installed.
 
 To cut a release: tag `vX.Y.Z` and push; the workflow runs GoReleaser. Test
-locally with `goreleaser release --snapshot --clean`.
+locally with `goreleaser release --snapshot --clean`. The pinned bootstrap URL is
+a maintenance tripwire — the tag it points at must exist and contain
+`scripts/install-sjctl.{sh,ps1}` or all five skills 404 on first install, and the
+pin must be bumped in every skill on each release or it goes stale (the script
+still resolves "latest" for the binary, but it is fetched from the pinned tag).
+Release checklist: after tagging, bump the `.../<tag>/scripts/install-sjctl.*`
+URLs in all five `.claude/skills/*/SKILL.md` to the new tag.
 
 ## sjctl command map
 

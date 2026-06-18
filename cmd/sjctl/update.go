@@ -138,7 +138,10 @@ func selfUpdate(out io.Writer, repo string, force, requireSignature bool) error 
 		return fail("resolve latest release", err)
 	}
 	// `sjctl version` prints main.version, which GoReleaser stamps without the
-	// leading v; compare against the tag with its v stripped.
+	// leading v; compare against the tag with its v stripped. This is an equality
+	// check, not a semver "is newer" comparison: /releases/latest excludes
+	// prereleases so in practice the resolved tag is always an upgrade, but a
+	// yanked or re-pointed "latest" could in theory drive a downgrade.
 	if !force && version == strings.TrimPrefix(tag, "v") {
 		fmt.Fprintf(out, "sjctl is already up to date (%s)\n", version)
 		return nil
@@ -382,6 +385,13 @@ func autoUpdateExempt(name string) bool {
 // current command continues on the running binary. Best-effort — any failure is
 // reported to stderr and otherwise ignored so it never blocks normal use.
 // Disable with SJCTL_NO_AUTO_UPDATE=1.
+//
+// Not concurrency-hardened, by design: two parallel sjctl runs (e.g. parallel
+// skills) can both pass the recentlyChecked gate before either touches the stamp
+// (a TOCTOU), and replaceRunningBinary uses a fixed .sjctl.new staging name, so
+// simultaneous swaps could race. The cost is at most a duplicated download and a
+// redundant atomic rename to the same bytes — low impact for a daily background
+// task, not worth a lockfile.
 func maybeAutoUpdate() {
 	if version == "dev" || os.Getenv("SJCTL_NO_AUTO_UPDATE") == "1" {
 		return
