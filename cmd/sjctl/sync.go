@@ -8,6 +8,12 @@ import (
 	"github.com/solid-company/solid-jobs-skills/internal/jobs"
 )
 
+// newOfferLite is the token-lean shape of a newly-seen offer in `sync --json`.
+type newOfferLite struct {
+	Watch string    `json:"watch"`
+	Offer offerLite `json:"offer"`
+}
+
 func newSyncCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "sync",
@@ -21,7 +27,18 @@ func newSyncCmd() *cobra.Command {
 					return fail("sync", err)
 				}
 				if gf.jsonOut {
-					return printJSON(res)
+					// Lean projection: drop the heavy per-offer fields (HTML
+					// description, logo, benefits) the digest triage never reads.
+					// Full offers stay cached and are retrievable via `offer show`.
+					newLite := make([]newOfferLite, len(res.New))
+					for i, n := range res.New {
+						newLite[i] = newOfferLite{Watch: n.Watch, Offer: toLiteOne(n.Offer)}
+					}
+					return printJSON(map[string]any{
+						"watchesRun": res.WatchesRun,
+						"totalSeen":  res.TotalSeen,
+						"new":        newLite,
+					})
 				}
 				if res.WatchesRun == 0 {
 					fmt.Println("no watches configured (add one with: sjctl watch add)")
