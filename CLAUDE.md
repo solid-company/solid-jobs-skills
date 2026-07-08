@@ -108,7 +108,7 @@ URLs in all five `.claude/skills/*/SKILL.md` to the new tag.
 | `watch add/list/rm` | Saved searches for sync |
 | `sync` | Run watches, report offers not seen before |
 | `stats` | Salary min/median/max, remote share, counts over cached offers |
-| `market` | Live server-side market statistics for a scope (division/category/subcategory/subcategoryGroup/city): demand, salary bands, experience mix, top locations/skills |
+| `market` | Live server-side market statistics for a scope (division/mainCategory/subcategory/subcategoryGroup/city): demand, salary bands, experience mix, top locations/skills |
 | `update` | Self-update to the latest release (verified); runs automatically once/day |
 
 Global flags: `--db`, `--campaign`, `--json`, `--profile`.
