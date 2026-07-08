@@ -62,6 +62,13 @@ func (s *Service) SalaryStats(ctx context.Context, f stats.Filter) (*stats.Resul
 	return stats.Compute(ctx, s.Store.Queries(), f)
 }
 
+// MarketStatistics fetches server-side market statistics for a scope from the
+// public API. Unlike SalaryStats (which aggregates the local cache), this
+// reflects the whole live market for the given division/category/city/etc.
+func (s *Service) MarketStatistics(ctx context.Context, scopeKind, scopeKey string, fields []string) (*api.MarketStats, error) {
+	return s.Client.MarketStatistics(ctx, scopeKind, scopeKey, fields)
+}
+
 // NewOffer pairs a fresh offer with the watch that surfaced it.
 type NewOffer struct {
 	Watch string    `json:"watch"`
