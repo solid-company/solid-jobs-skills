@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -32,6 +33,11 @@ func newMarketCmd() *cobra.Command {
 			if !api.ValidScopeKind(scopeKind) {
 				return fmt.Errorf("invalid scope kind %q: valid: %v", scopeKind, api.ScopeKinds)
 			}
+			for _, f := range fields {
+				if !api.ValidMarketSection(f) {
+					return fmt.Errorf("invalid --fields section %q: valid: %v", f, api.MarketSections)
+				}
+			}
 			return withService(func(s *jobs.Service) error {
 				res, err := s.MarketStatistics(cmd.Context(), scopeKind, scopeKey, fields)
 				if err != nil {
@@ -46,7 +52,7 @@ func newMarketCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringSliceVar(&fields, "fields", nil,
-		"limit to sections (comma-separated): demand, salary, experience, topLocations, topSkills")
+		"limit to sections (comma-separated): "+strings.Join(api.MarketSections, ", "))
 	return cmd
 }
 
@@ -55,6 +61,12 @@ func printMarketStats(m *api.MarketStats) {
 	fmt.Printf("Scope:    %s / %s\n", m.ScopeKind, m.ScopeKey)
 	fmt.Printf("As of:    %s\n", m.GeneratedAt.Format("2006-01-02 15:04 MST"))
 	fmt.Printf("Sections: %v\n", m.IncludedSections)
+
+	if m.Demand == nil && m.Salary == nil &&
+		len(m.Experience) == 0 && len(m.TopLocations) == 0 && len(m.TopSkills) == 0 {
+		fmt.Println("\nno market data for this scope")
+		return
+	}
 
 	if d := m.Demand; d != nil {
 		fmt.Println("\nDemand:")
@@ -88,10 +100,10 @@ func printMarketStats(m *api.MarketStats) {
 
 func printContractSalary(label string, s *api.SalaryStat) {
 	if s == nil {
-		fmt.Printf("  %-9s (no precomputed data)\n", label+":")
+		fmt.Printf("  %-10s (no precomputed data)\n", label+":")
 		return
 	}
-	fmt.Printf("  %-9s median %.0f | average %.0f | %d offers\n", label+":", s.Median, s.Average, s.OfferCount)
+	fmt.Printf("  %-10s median %.0f | average %.0f | %d offers\n", label+":", s.Median, s.Average, s.OfferCount)
 }
 
 func printBucketSection(title string, buckets []api.Bucket) {
