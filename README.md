@@ -53,7 +53,7 @@ go build -o sjctl ./cmd/sjctl
 ```
 
 In Claude Code, use the skills: `/jobs-search`, `/jobs-evaluate`, `/jobs-track`,
-`/jobs-digest`.
+`/jobs-digest`, `/jobs-interview`.
 
 ## Features (MVP)
 
@@ -62,6 +62,9 @@ In Claude Code, use the skills: `/jobs-search`, `/jobs-evaluate`, `/jobs-track`,
   with auto-expiry past `validTo`.
 - **Evaluate** offers A–F against your profile (via the `jobs-evaluate` skill),
   persisted for later review.
+- **Interview prep** (via the `jobs-interview` skill): gap analysis with a
+  readiness score, a tailored question bank, questions to ask the recruiter, and
+  a mock-interview loop where per-question confidence recomputes readiness.
 - **Watch & digest** saved searches, reporting only offers you haven't seen.
 - **Stats**: salary min/median/max, remote share, counts by experience level.
 

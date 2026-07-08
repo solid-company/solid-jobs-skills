@@ -135,6 +135,64 @@ FROM evaluations
 WHERE offer_key = ? AND profile_id = ?
 ORDER BY created_at DESC LIMIT 1;
 
+-- ===== interviews =====
+
+-- name: InsertInterviewPrep :one
+INSERT INTO interview_preps (offer_key, profile_id, readiness, gaps, questions_to_ask, summary, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id, created_at, updated_at;
+
+-- name: InsertInterviewQuestion :one
+INSERT INTO interview_questions (prep_id, category, question, difficulty, talking_points, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+RETURNING id;
+
+-- name: LatestInterviewPrep :one
+SELECT id, offer_key, profile_id, readiness, gaps, questions_to_ask, summary, created_at, updated_at
+FROM interview_preps
+WHERE offer_key = ? AND profile_id = ?
+ORDER BY created_at DESC LIMIT 1;
+
+-- name: ListInterviewPreps :many
+SELECT p.id, p.offer_key, p.profile_id, p.readiness, p.gaps, p.questions_to_ask,
+       p.summary, p.created_at, p.updated_at,
+       o.title, o.company, o.url
+FROM interview_preps p
+JOIN offers o ON o.offer_key = p.offer_key
+WHERE p.profile_id = ?
+ORDER BY p.updated_at DESC;
+
+-- name: QuestionsForPrep :many
+SELECT id, prep_id, category, question, difficulty, talking_points, confidence, practiced_count, created_at, updated_at
+FROM interview_questions
+WHERE prep_id = ?
+ORDER BY category, id;
+
+-- name: NextPracticeQuestions :many
+SELECT id, prep_id, category, question, difficulty, talking_points, confidence, practiced_count, created_at, updated_at
+FROM interview_questions
+WHERE prep_id = ?
+ORDER BY confidence ASC, practiced_count ASC, id ASC
+LIMIT ?;
+
+-- name: GetQuestion :one
+SELECT id, prep_id, category, question, difficulty, talking_points, confidence, practiced_count, created_at, updated_at
+FROM interview_questions
+WHERE id = ?;
+
+-- name: UpdateQuestionConfidence :execrows
+UPDATE interview_questions
+SET confidence = ?, practiced_count = practiced_count + 1, updated_at = ?
+WHERE id = ?;
+
+-- name: UpdatePrepReadiness :execrows
+UPDATE interview_preps SET readiness = ?, updated_at = ? WHERE id = ?;
+
+-- name: GetInterviewPrep :one
+SELECT id, offer_key, profile_id, readiness, gaps, questions_to_ask, summary, created_at, updated_at
+FROM interview_preps
+WHERE id = ?;
+
 -- ===== watches =====
 
 -- name: UpsertWatch :exec
