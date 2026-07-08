@@ -106,6 +106,17 @@ func ValidScopeKind(s string) bool {
 // the market-statistics endpoint.
 var MarketSections = []string{"demand", "salary", "experience", "topLocations", "topSkills"}
 
+// ValidMarketSection reports whether s names a known market-statistics section
+// token (case-insensitive, matching the API's `fields` filter).
+func ValidMarketSection(s string) bool {
+	for _, sec := range MarketSections {
+		if strings.EqualFold(sec, s) {
+			return true
+		}
+	}
+	return false
+}
+
 // MarketStats is the flat, stable statistics contract returned by
 // GET /public-api/market-statistics/{scopeKind}/{scopeKey}. Optional sections
 // are nil when not requested (or unavailable for the scope).
@@ -133,11 +144,14 @@ type DemandStats struct {
 // TrendPoint is one quarterly point of the offer-count trend.
 type TrendPoint struct {
 	Period     string `json:"period"`
-	OfferCount int64  `json:"offerCount"`
+	OfferCount int    `json:"offerCount"`
 }
 
-// SalaryStats holds salary metrics for a scope. All amounts are monthly, in the
-// currency below (always PLN today). Overall/B2B/Permanent are nil when absent.
+// SalaryStats holds salary metrics for a scope, in the currency below (PLN
+// today). Amounts are assumed monthly: the endpoint carries no interval field,
+// so callers comparing an offer's band against these should account for
+// offer-level Salary.Period (e.g. hourly/daily B2B rates). Overall/B2B/Permanent
+// are nil when absent.
 type SalaryStats struct {
 	Currency  string      `json:"currency"`
 	Overall   *SalaryBand `json:"overall"`
