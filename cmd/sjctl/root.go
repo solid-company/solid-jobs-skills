@@ -37,12 +37,14 @@ func newRootCmd() *cobra.Command {
 
 	root.AddCommand(
 		newSearchCmd(),
+		newOfferCmd(),
 		newTrackCmd(),
 		newSyncCmd(),
 		newStatsCmd(),
 		newProfileCmd(),
 		newWatchCmd(),
 		newEvaluateCmd(),
+		newInterviewCmd(),
 		newVersionCmd(),
 	)
 	return root

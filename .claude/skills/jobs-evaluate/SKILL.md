@@ -9,7 +9,7 @@ Judge how well a cached offer fits the user's profile, give a graded verdict, an
 
 ## Inputs
 
-1. The offer — fetch it from the cache by key. The offer must have been seen by a prior search; if not, run `/jobs-search` first.
+1. The offer — read it from the cache by key with `sjctl offer show <offerKey> --json` (full detail, description as plain text, no API call). The offer must have been seen by a prior search; if not, run `/jobs-search` first. Don't re-run `search` to get one offer — that re-fetches the whole page.
 2. The profile — `sjctl profile show --json` (the default profile, or pass `--profile <name>`).
 
 Resolve `sjctl` in this order: (1) on `PATH`, (2) `~/.solid-jobs-skills/bin/sjctl[.exe]`, (3) `./sjctl[.exe]` in the repo. If none exist, install it and use the printed path:

@@ -23,6 +23,8 @@ The installer downloads a checksum-verified release binary into `~/.solid-jobs-s
 
 Always pass `--json` so you can parse and reason over the results, then summarize for the user.
 
+`search --json` returns a **lean list** — key, title, company, salary, mode, location, experience, skills, languages — with the full HTML job description omitted to save tokens. The complete offer is still cached; when you need the full description for one offer (e.g. before `/jobs-evaluate` or `/jobs-interview`), read it on demand with `sjctl offer show <jobOfferKey> --json`, which serves the description as plain text from the cache with no extra API call.
+
 ## Mapping language to flags
 
 | User says | Flag |
