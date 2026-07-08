@@ -63,20 +63,24 @@ func truncate(s string, n int) string {
 // printOffersTable renders offers as a table.
 func printOffersTable(offers []api.Offer) {
 	w := newTabWriter()
-	fmt.Fprintln(w, "KEY\tTITLE\tCOMPANY\tSALARY\tMODE\tLOCATION")
+	fmt.Fprintln(w, "KEY\tTITLE\tCOMPANY\tSALARY\tMODE\tLOCATION\tLINK")
 	for i := range offers {
 		o := &offers[i]
 		loc := strings.Join(o.Locations, ", ")
 		if o.IsRemote {
 			loc = "Remote"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		// LINK is printed as a bare URL (last column) so it stays clickable in
+		// modern terminals; it is not wrapped in OSC-8 escapes because tabwriter
+		// counts escape bytes as width and would misalign the columns.
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			o.JobOfferKey,
 			truncate(o.Title, 40),
 			truncate(o.Company, 24),
 			salaryStr(o.Salary),
 			workMode(o),
 			truncate(loc, 24),
+			o.URL,
 		)
 	}
 	w.Flush()

@@ -17,6 +17,18 @@ TARGET_VERSION="${SJCTL_VERSION:-latest}"
 
 err() { echo "install-sjctl: $*" >&2; exit 1; }
 
+# Extract the tag_name from a GitHub release JSON document read on stdin.
+# GitHub returns this JSON minified (one line), so a line-oriented `cut -f4`
+# would slice the wrong field. Isolate the tag_name token first; the regex
+# tolerates both minified ("tag_name":"v1") and pretty (": "v1") spacing.
+extract_tag_name() {
+  grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d '"' -f4
+}
+
+# When sourced (e.g. by install-sjctl_test.sh) expose the helpers above without
+# performing any installation. Executing the script directly runs the rest.
+(return 0 2>/dev/null) && return 0
+
 # Common curl flags: an explicit User-Agent (the GitHub API requires one, and
 # this keeps us symmetric with the PowerShell installer) plus, when present, a
 # token to lift the 60-requests/hour anonymous rate limit.
@@ -43,7 +55,7 @@ esac
 # --- resolve target tag ------------------------------------------------------
 api="https://api.github.com/repos/${REPO}/releases"
 if [ "$TARGET_VERSION" = "latest" ]; then
-  tag="$(curl "${curl_args[@]}" "${api}/latest" | grep -m1 '"tag_name"' | cut -d '"' -f4)"
+  tag="$(curl "${curl_args[@]}" "${api}/latest" | extract_tag_name)"
   [ -n "$tag" ] || err "could not resolve latest release for $REPO"
 else
   tag="$TARGET_VERSION"
