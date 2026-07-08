@@ -85,6 +85,7 @@ locally with `goreleaser release --snapshot --clean`.
 | `watch add/list/rm` | Saved searches for sync |
 | `sync` | Run watches, report offers not seen before |
 | `stats` | Salary min/median/max, remote share, counts over cached offers |
+| `market` | Live server-side market statistics for a scope (division/category/subcategory/subcategoryGroup/city): demand, salary bands, experience mix, top locations/skills |
 
 Global flags: `--db`, `--campaign`, `--json`, `--profile`.
 
@@ -102,6 +103,11 @@ Global flags: `--db`, `--campaign`, `--json`, `--profile`.
 - No auth — only a mandatory `campaign` param (lowercase/digits/hyphens, ≤64 chars);
   default `solid-jobs-skills`.
 - Rate limit 300 req/min per IP; the client retries 429 with exponential backoff.
+- `GET https://solid.jobs/public-api/market-statistics/{scopeKind}/{scopeKey}` returns
+  aggregated market stats for a scope. `scopeKind` ∈ {division, mainCategory, subcategory,
+  subcategoryGroup, city} (case-insensitive); optional `fields` filters sections
+  (demand, salary, experience, topLocations, topSkills). This is a live, server-side
+  aggregate — distinct from `stats`, which aggregates the local offer cache.
 
 ## Roadmap
 
