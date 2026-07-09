@@ -10,8 +10,9 @@ import (
 )
 
 // offerLite is the token-lean projection of an Offer used for list output
-// (search, sync). It drops the heavy fields — the raw HTML description, logo
-// URL, benefits and timestamps — that browse/triage never reads. The full
+// (search, sync). It keeps validTo (needed for expiry) but drops the heavy
+// fields — the raw HTML description, logo URL, benefits, secondary salary and
+// the create/publish timestamps — that browse/triage never reads. The full
 // offer is still cached in SQLite by UpsertOffers and retrievable in full via
 // `sjctl offer show <key>`.
 type offerLite struct {
@@ -72,7 +73,13 @@ func fmtDate(t time.Time) string {
 	return t.UTC().Format("2006-01-02")
 }
 
-var htmlTagRe = regexp.MustCompile(`(?s)<[^>]*>`)
+var (
+	htmlTagRe = regexp.MustCompile(`(?s)<[^>]*>`)
+	// liOpenRe matches an opening <li>, including attributed forms like
+	// <li class="…"> that real API HTML carries, so each list item keeps its
+	// bullet rather than losing it to the generic tag strip.
+	liOpenRe = regexp.MustCompile(`(?i)<li\b[^>]*>`)
+)
 
 // htmlToText converts an offer's HTML description into compact plain text:
 // block tags become line breaks, list items get a bullet, remaining tags are
@@ -82,8 +89,8 @@ func htmlToText(s string) string {
 	if s == "" {
 		return ""
 	}
+	s = liOpenRe.ReplaceAllString(s, "\n• ")
 	repl := strings.NewReplacer(
-		"<li>", "\n• ", "<li >", "\n• ",
 		"</li>", "\n", "</p>", "\n", "</ul>", "\n", "</div>", "\n",
 		"<br>", "\n", "<br/>", "\n", "<br />", "\n",
 	)

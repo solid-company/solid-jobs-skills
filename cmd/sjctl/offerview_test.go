@@ -62,4 +62,10 @@ func TestHTMLToText(t *testing.T) {
 	if htmlToText("") != "" {
 		t.Error("htmlToText(\"\") should be empty")
 	}
+
+	// Attributed <li> (common in real API HTML) still gets a bullet.
+	attributed := `<ul><li class="item">One</li><li style="x">Two</li></ul>`
+	if got := htmlToText(attributed); got != "• One\n• Two" {
+		t.Errorf("attributed <li> bullets: got %q, want %q", got, "• One\n• Two")
+	}
 }
