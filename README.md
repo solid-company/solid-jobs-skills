@@ -40,9 +40,10 @@ SQLite, `CGO_ENABLED=0`).
 
 ## The skills
 
-Five skills, each a natural-language playbook over `sjctl`. A typical loop:
+Six skills, each a natural-language playbook over `sjctl`. A typical loop:
 **search** offers → set up your **profile** → **evaluate** the interesting ones →
-**track** what you apply to → **digest** new matches as they appear.
+**track** what you apply to → **prep** for the interview → **digest** new matches
+as they appear.
 
 ### `/jobs-search` — find & browse offers
 
@@ -115,6 +116,23 @@ and auto-expiry once an offer's `validTo` passes.
   company, status, grade (from the latest evaluation), and key.
 - **Chains from:** `/jobs-search`, `/jobs-evaluate`, `/jobs-digest`.
 
+### `/jobs-interview` — prepare for the interview
+
+Turns a cached offer plus your profile into an interview prep pack, persists it,
+and can run a mock interview that tracks readiness.
+
+- **Triggers on:** "prepare me for this interview", "interview questions for this
+  job", "mock interview", "przygotuj mnie do rozmowy".
+- **What it produces:** a gap analysis with a 0–100 readiness score, a tailored
+  question bank (technical per required skill + behavioral/situational with talking
+  points), and questions to ask the recruiter.
+- **Under the hood:** reads the cached offer, `sjctl profile show --json`, and the
+  latest evaluation as a seed, then persists the pack with `sjctl interview save
+  <offerKey> --readiness … --gaps … --ask … --questions …`. `sjctl interview
+  practice` surfaces the lowest-confidence questions and `interview rate
+  <questionId> <0-5>` recomputes readiness from per-question confidence.
+- **Chains from:** `/jobs-evaluate` (reuses the grade and dimensions as a seed).
+
 ### `/jobs-digest` — what's new since last time
 
 Runs your saved searches (watches), reports only offers you haven't seen, and
@@ -160,8 +178,8 @@ go build -o sjctl ./cmd/sjctl
 ./sjctl sync
 ```
 
-In Claude Code, use the skills: `/jobs-search`, `/jobs-evaluate`, `/jobs-track`,
-`/jobs-digest`, `/jobs-interview`.
+In Claude Code, use the skills: `/jobs-search`, `/jobs-create-profile`,
+`/jobs-evaluate`, `/jobs-track`, `/jobs-interview`, `/jobs-digest`.
 
 ## Features
 

@@ -14,8 +14,8 @@ Turn a cached offer + the user's profile into an interview prep pack, persist it
 3. The latest evaluation, as a seed for the gap analysis — `sjctl evaluate show <offerKey> --json`. If it exists, reuse `dimensions.skillMatch` / `seniorityFit` and `rationale`, and seed readiness from `grade`. If it does not exist, do the gap analysis yourself and suggest running `/jobs-evaluate` first.
 
 Resolve `sjctl` in this order: (1) on `PATH`, (2) `~/.solid-jobs-skills/bin/sjctl[.exe]`, (3) `./sjctl[.exe]` in the repo. If none exist, install it and use the printed path:
-- macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/solid-company/solid-jobs-skills/main/scripts/install-sjctl.sh | bash`
-- Windows: `irm https://raw.githubusercontent.com/solid-company/solid-jobs-skills/main/scripts/install-sjctl.ps1 | iex`
+- macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/solid-company/solid-jobs-skills/v0.3.0/scripts/install-sjctl.sh | bash`
+- Windows: `irm https://raw.githubusercontent.com/solid-company/solid-jobs-skills/v0.3.0/scripts/install-sjctl.ps1 | iex`
 - Dev fallback (Go, inside repo): `go run ./cmd/sjctl`
 
 ## Build the prep pack
