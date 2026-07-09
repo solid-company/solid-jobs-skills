@@ -60,7 +60,7 @@ func newSearchCmd() *cobra.Command {
 					out := map[string]any{
 						"pageIndex": resp.PageIndex,
 						"pageSize":  resp.PageSize,
-						"jobs":      offers,
+						"jobs":      toLite(offers),
 					}
 					if remoteOnly {
 						// Client-side filter: server totals don't describe this subset.

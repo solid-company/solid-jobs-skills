@@ -16,10 +16,12 @@ user's request matches one, **open that file and follow it** — the frontmatter
 | `jobs-create-profile` | set up / update / switch their candidate profile |
 | `jobs-evaluate` | judge whether a specific offer is worth it |
 | `jobs-track` | track applications through a pipeline |
+| `jobs-interview` | prepare for an interview / run a mock interview |
 | `jobs-digest` | see what's new since last check |
 
 Routing files: `jobs-search/SKILL.md`, `jobs-create-profile/SKILL.md`,
-`jobs-evaluate/SKILL.md`, `jobs-track/SKILL.md`, `jobs-digest/SKILL.md`.
+`jobs-evaluate/SKILL.md`, `jobs-track/SKILL.md`, `jobs-interview/SKILL.md`,
+`jobs-digest/SKILL.md`.
 
 ## Running sjctl
 

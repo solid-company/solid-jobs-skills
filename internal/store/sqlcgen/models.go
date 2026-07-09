@@ -18,6 +18,31 @@ type Evaluation struct {
 	CreatedAt  string
 }
 
+type InterviewPrep struct {
+	ID             int64
+	OfferKey       string
+	ProfileID      int64
+	Readiness      int64
+	Gaps           string
+	QuestionsToAsk string
+	Summary        string
+	CreatedAt      string
+	UpdatedAt      string
+}
+
+type InterviewQuestion struct {
+	ID             int64
+	PrepID         int64
+	Category       string
+	Question       string
+	Difficulty     string
+	TalkingPoints  string
+	Confidence     int64
+	PracticedCount int64
+	CreatedAt      string
+	UpdatedAt      string
+}
+
 type Offer struct {
 	OfferKey        string
 	Title           string

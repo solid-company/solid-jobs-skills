@@ -12,26 +12,37 @@ type Querier interface {
 	CountProfiles(ctx context.Context) (int64, error)
 	DefaultProfile(ctx context.Context) (Profile, error)
 	ExpireStale(ctx context.Context, arg ExpireStaleParams) (int64, error)
+	GetInterviewPrep(ctx context.Context, id int64) (InterviewPrep, error)
 	GetOfferRaw(ctx context.Context, offerKey string) (string, error)
 	GetProfile(ctx context.Context, id int64) (Profile, error)
 	GetProfileByName(ctx context.Context, name string) (Profile, error)
+	GetQuestion(ctx context.Context, id int64) (InterviewQuestion, error)
 	GetTracked(ctx context.Context, arg GetTrackedParams) (GetTrackedRow, error)
 	GetWatchByName(ctx context.Context, name string) (Watch, error)
 	// ===== evaluations =====
 	InsertEvaluation(ctx context.Context, arg InsertEvaluationParams) (InsertEvaluationRow, error)
+	// ===== interviews =====
+	InsertInterviewPrep(ctx context.Context, arg InsertInterviewPrepParams) (InsertInterviewPrepRow, error)
+	InsertInterviewQuestion(ctx context.Context, arg InsertInterviewQuestionParams) (int64, error)
 	// ===== profiles =====
 	InsertProfile(ctx context.Context, arg InsertProfileParams) (int64, error)
 	// ===== tracker =====
 	InsertTracked(ctx context.Context, arg InsertTrackedParams) error
 	IsSeen(ctx context.Context, offerKey string) (bool, error)
 	LatestEvaluation(ctx context.Context, arg LatestEvaluationParams) (Evaluation, error)
+	LatestInterviewPrep(ctx context.Context, arg LatestInterviewPrepParams) (InterviewPrep, error)
+	// Latest prep per offer for a profile (history is preserved, but the list shows
+	// one row per offer), decorated with the offer's title/company/url.
+	ListInterviewPreps(ctx context.Context, profileID int64) ([]ListInterviewPrepsRow, error)
 	ListProfiles(ctx context.Context) ([]Profile, error)
 	ListTracked(ctx context.Context, arg ListTrackedParams) ([]ListTrackedRow, error)
 	ListWatches(ctx context.Context) ([]Watch, error)
 	// ===== seen =====
 	MarkSeen(ctx context.Context, arg MarkSeenParams) (int64, error)
+	NextPracticeQuestions(ctx context.Context, arg NextPracticeQuestionsParams) ([]InterviewQuestion, error)
 	OfferExists(ctx context.Context, offerKey string) (bool, error)
 	ProfileExists(ctx context.Context, id int64) (bool, error)
+	QuestionsForPrep(ctx context.Context, prepID int64) ([]InterviewQuestion, error)
 	RemoveTracked(ctx context.Context, arg RemoveTrackedParams) (int64, error)
 	RemoveWatch(ctx context.Context, name string) (int64, error)
 	SalaryRows(ctx context.Context, arg SalaryRowsParams) ([]SalaryRowsRow, error)
@@ -41,6 +52,8 @@ type Querier interface {
 	SetNotes(ctx context.Context, arg SetNotesParams) (int64, error)
 	SetProfileContent(ctx context.Context, arg SetProfileContentParams) (int64, error)
 	SetStatus(ctx context.Context, arg SetStatusParams) (int64, error)
+	UpdatePrepReadiness(ctx context.Context, arg UpdatePrepReadinessParams) (int64, error)
+	UpdateQuestionConfidence(ctx context.Context, arg UpdateQuestionConfidenceParams) (int64, error)
 	// Queries for solid-jobs-skills, compiled by sqlc into internal/store/sqlcgen.
 	// The store package wraps these generated methods; no SQL is inlined in Go.
 	// ===== offers =====

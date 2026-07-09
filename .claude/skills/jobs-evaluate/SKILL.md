@@ -9,7 +9,7 @@ Judge how well a cached offer fits the user's profile, give a graded verdict, an
 
 ## Inputs
 
-1. The offer — fetch it from the cache by key. The offer must have been seen by a prior search; if not, run `/jobs-search` first.
+1. The offer — read it from the cache by key with `sjctl offer show <offerKey> --json` (full detail, description as plain text, no API call). The offer must have been seen by a prior search; if not, run `/jobs-search` first. Don't re-run `search` to get one offer — that re-fetches the whole page.
 2. The profile — `sjctl profile show --json` (the default profile, or pass `--profile <name>`).
 3. Market context (optional but recommended for **Salary fit**) — pull live market salary bands for the offer's specialization or division, e.g. `sjctl market subcategory <SubCategory> --fields salary,demand --json` (fall back to `sjctl market division <Division> --fields salary --json`). Compare the offer's band to the market `median`/`p25`/`p75` instead of judging it in a vacuum, and note demand (`activeOffers`, `remotePercentage`) for leverage.
 

@@ -64,6 +64,29 @@ func (q *Queries) ExpireStale(ctx context.Context, arg ExpireStaleParams) (int64
 	return result.RowsAffected()
 }
 
+const getInterviewPrep = `-- name: GetInterviewPrep :one
+SELECT id, offer_key, profile_id, readiness, gaps, questions_to_ask, summary, created_at, updated_at
+FROM interview_preps
+WHERE id = ?
+`
+
+func (q *Queries) GetInterviewPrep(ctx context.Context, id int64) (InterviewPrep, error) {
+	row := q.db.QueryRowContext(ctx, getInterviewPrep, id)
+	var i InterviewPrep
+	err := row.Scan(
+		&i.ID,
+		&i.OfferKey,
+		&i.ProfileID,
+		&i.Readiness,
+		&i.Gaps,
+		&i.QuestionsToAsk,
+		&i.Summary,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getOfferRaw = `-- name: GetOfferRaw :one
 SELECT raw FROM offers WHERE offer_key = ?
 `
@@ -107,6 +130,30 @@ func (q *Queries) GetProfileByName(ctx context.Context, name string) (Profile, e
 		&i.Name,
 		&i.Content,
 		&i.IsDefault,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getQuestion = `-- name: GetQuestion :one
+SELECT id, prep_id, category, question, difficulty, talking_points, confidence, practiced_count, created_at, updated_at
+FROM interview_questions
+WHERE id = ?
+`
+
+func (q *Queries) GetQuestion(ctx context.Context, id int64) (InterviewQuestion, error) {
+	row := q.db.QueryRowContext(ctx, getQuestion, id)
+	var i InterviewQuestion
+	err := row.Scan(
+		&i.ID,
+		&i.PrepID,
+		&i.Category,
+		&i.Question,
+		&i.Difficulty,
+		&i.TalkingPoints,
+		&i.Confidence,
+		&i.PracticedCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -211,6 +258,78 @@ func (q *Queries) InsertEvaluation(ctx context.Context, arg InsertEvaluationPara
 	return i, err
 }
 
+const insertInterviewPrep = `-- name: InsertInterviewPrep :one
+
+INSERT INTO interview_preps (offer_key, profile_id, readiness, gaps, questions_to_ask, summary, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id, created_at, updated_at
+`
+
+type InsertInterviewPrepParams struct {
+	OfferKey       string
+	ProfileID      int64
+	Readiness      int64
+	Gaps           string
+	QuestionsToAsk string
+	Summary        string
+	CreatedAt      string
+	UpdatedAt      string
+}
+
+type InsertInterviewPrepRow struct {
+	ID        int64
+	CreatedAt string
+	UpdatedAt string
+}
+
+// ===== interviews =====
+func (q *Queries) InsertInterviewPrep(ctx context.Context, arg InsertInterviewPrepParams) (InsertInterviewPrepRow, error) {
+	row := q.db.QueryRowContext(ctx, insertInterviewPrep,
+		arg.OfferKey,
+		arg.ProfileID,
+		arg.Readiness,
+		arg.Gaps,
+		arg.QuestionsToAsk,
+		arg.Summary,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i InsertInterviewPrepRow
+	err := row.Scan(&i.ID, &i.CreatedAt, &i.UpdatedAt)
+	return i, err
+}
+
+const insertInterviewQuestion = `-- name: InsertInterviewQuestion :one
+INSERT INTO interview_questions (prep_id, category, question, difficulty, talking_points, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+RETURNING id
+`
+
+type InsertInterviewQuestionParams struct {
+	PrepID        int64
+	Category      string
+	Question      string
+	Difficulty    string
+	TalkingPoints string
+	CreatedAt     string
+	UpdatedAt     string
+}
+
+func (q *Queries) InsertInterviewQuestion(ctx context.Context, arg InsertInterviewQuestionParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertInterviewQuestion,
+		arg.PrepID,
+		arg.Category,
+		arg.Question,
+		arg.Difficulty,
+		arg.TalkingPoints,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertProfile = `-- name: InsertProfile :one
 
 INSERT INTO profiles (name, content, is_default, created_at, updated_at)
@@ -280,7 +399,7 @@ const latestEvaluation = `-- name: LatestEvaluation :one
 SELECT id, offer_key, profile_id, grade, dimensions, rationale, created_at
 FROM evaluations
 WHERE offer_key = ? AND profile_id = ?
-ORDER BY created_at DESC LIMIT 1
+ORDER BY created_at DESC, id DESC LIMIT 1
 `
 
 type LatestEvaluationParams struct {
@@ -301,6 +420,98 @@ func (q *Queries) LatestEvaluation(ctx context.Context, arg LatestEvaluationPara
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const latestInterviewPrep = `-- name: LatestInterviewPrep :one
+SELECT id, offer_key, profile_id, readiness, gaps, questions_to_ask, summary, created_at, updated_at
+FROM interview_preps
+WHERE offer_key = ? AND profile_id = ?
+ORDER BY created_at DESC, id DESC LIMIT 1
+`
+
+type LatestInterviewPrepParams struct {
+	OfferKey  string
+	ProfileID int64
+}
+
+func (q *Queries) LatestInterviewPrep(ctx context.Context, arg LatestInterviewPrepParams) (InterviewPrep, error) {
+	row := q.db.QueryRowContext(ctx, latestInterviewPrep, arg.OfferKey, arg.ProfileID)
+	var i InterviewPrep
+	err := row.Scan(
+		&i.ID,
+		&i.OfferKey,
+		&i.ProfileID,
+		&i.Readiness,
+		&i.Gaps,
+		&i.QuestionsToAsk,
+		&i.Summary,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listInterviewPreps = `-- name: ListInterviewPreps :many
+SELECT p.id, p.offer_key, p.profile_id, p.readiness, p.summary,
+       p.created_at, p.updated_at,
+       o.title, o.company, o.url
+FROM interview_preps p
+JOIN offers o ON o.offer_key = p.offer_key
+WHERE p.profile_id = ?
+  AND p.id = (
+      SELECT p2.id FROM interview_preps p2
+      WHERE p2.offer_key = p.offer_key AND p2.profile_id = p.profile_id
+      ORDER BY p2.created_at DESC, p2.id DESC LIMIT 1)
+ORDER BY p.updated_at DESC, p.id DESC
+`
+
+type ListInterviewPrepsRow struct {
+	ID        int64
+	OfferKey  string
+	ProfileID int64
+	Readiness int64
+	Summary   string
+	CreatedAt string
+	UpdatedAt string
+	Title     string
+	Company   string
+	Url       sql.NullString
+}
+
+// Latest prep per offer for a profile (history is preserved, but the list shows
+// one row per offer), decorated with the offer's title/company/url.
+func (q *Queries) ListInterviewPreps(ctx context.Context, profileID int64) ([]ListInterviewPrepsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listInterviewPreps, profileID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListInterviewPrepsRow{}
+	for rows.Next() {
+		var i ListInterviewPrepsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OfferKey,
+			&i.ProfileID,
+			&i.Readiness,
+			&i.Summary,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Company,
+			&i.Url,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listProfiles = `-- name: ListProfiles :many
@@ -459,6 +670,53 @@ func (q *Queries) MarkSeen(ctx context.Context, arg MarkSeenParams) (int64, erro
 	return result.RowsAffected()
 }
 
+const nextPracticeQuestions = `-- name: NextPracticeQuestions :many
+SELECT id, prep_id, category, question, difficulty, talking_points, confidence, practiced_count, created_at, updated_at
+FROM interview_questions
+WHERE prep_id = ?
+ORDER BY confidence ASC, practiced_count ASC, id ASC
+LIMIT ?
+`
+
+type NextPracticeQuestionsParams struct {
+	PrepID int64
+	Limit  int64
+}
+
+func (q *Queries) NextPracticeQuestions(ctx context.Context, arg NextPracticeQuestionsParams) ([]InterviewQuestion, error) {
+	rows, err := q.db.QueryContext(ctx, nextPracticeQuestions, arg.PrepID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []InterviewQuestion{}
+	for rows.Next() {
+		var i InterviewQuestion
+		if err := rows.Scan(
+			&i.ID,
+			&i.PrepID,
+			&i.Category,
+			&i.Question,
+			&i.Difficulty,
+			&i.TalkingPoints,
+			&i.Confidence,
+			&i.PracticedCount,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const offerExists = `-- name: OfferExists :one
 SELECT EXISTS(SELECT 1 FROM offers WHERE offer_key = ?)
 `
@@ -479,6 +737,47 @@ func (q *Queries) ProfileExists(ctx context.Context, id int64) (bool, error) {
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const questionsForPrep = `-- name: QuestionsForPrep :many
+SELECT id, prep_id, category, question, difficulty, talking_points, confidence, practiced_count, created_at, updated_at
+FROM interview_questions
+WHERE prep_id = ?
+ORDER BY category, id
+`
+
+func (q *Queries) QuestionsForPrep(ctx context.Context, prepID int64) ([]InterviewQuestion, error) {
+	rows, err := q.db.QueryContext(ctx, questionsForPrep, prepID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []InterviewQuestion{}
+	for rows.Next() {
+		var i InterviewQuestion
+		if err := rows.Scan(
+			&i.ID,
+			&i.PrepID,
+			&i.Category,
+			&i.Question,
+			&i.Difficulty,
+			&i.TalkingPoints,
+			&i.Confidence,
+			&i.PracticedCount,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const removeTracked = `-- name: RemoveTracked :execrows
@@ -698,6 +997,44 @@ func (q *Queries) SetStatus(ctx context.Context, arg SetStatusParams) (int64, er
 		arg.OfferKey,
 		arg.ProfileID,
 	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updatePrepReadiness = `-- name: UpdatePrepReadiness :execrows
+UPDATE interview_preps SET readiness = ?, updated_at = ? WHERE id = ?
+`
+
+type UpdatePrepReadinessParams struct {
+	Readiness int64
+	UpdatedAt string
+	ID        int64
+}
+
+func (q *Queries) UpdatePrepReadiness(ctx context.Context, arg UpdatePrepReadinessParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updatePrepReadiness, arg.Readiness, arg.UpdatedAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateQuestionConfidence = `-- name: UpdateQuestionConfidence :execrows
+UPDATE interview_questions
+SET confidence = ?, practiced_count = practiced_count + 1, updated_at = ?
+WHERE id = ?
+`
+
+type UpdateQuestionConfidenceParams struct {
+	Confidence int64
+	UpdatedAt  string
+	ID         int64
+}
+
+func (q *Queries) UpdateQuestionConfidence(ctx context.Context, arg UpdateQuestionConfidenceParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateQuestionConfidence, arg.Confidence, arg.UpdatedAt, arg.ID)
 	if err != nil {
 		return 0, err
 	}

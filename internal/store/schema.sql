@@ -66,6 +66,42 @@ CREATE TABLE IF NOT EXISTS evaluations (
 );
 CREATE INDEX IF NOT EXISTS idx_eval_offer ON evaluations(offer_key, profile_id);
 
+-- Interview preparation sessions. One row per prep of an (offer, profile);
+-- history is preserved (like evaluations) so an offer can be re-prepped. The
+-- readiness score starts as the caller's save-time estimate and is recomputed
+-- from the average question confidence once questions are rated.
+CREATE TABLE IF NOT EXISTS interview_preps (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    offer_key        TEXT NOT NULL,
+    profile_id       INTEGER NOT NULL,
+    readiness        INTEGER NOT NULL DEFAULT 0,   -- 0..100
+    gaps             TEXT NOT NULL DEFAULT '[]',   -- JSON: [{skill, severity, note}]
+    questions_to_ask TEXT NOT NULL DEFAULT '[]',   -- JSON array of strings
+    summary          TEXT NOT NULL DEFAULT '',     -- gap-analysis narrative / strengths
+    created_at       TEXT NOT NULL,
+    updated_at       TEXT NOT NULL,
+    FOREIGN KEY (offer_key) REFERENCES offers(offer_key) ON DELETE CASCADE,
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_prep_offer ON interview_preps(offer_key, profile_id);
+
+-- Individual interview questions belonging to a prep. Drives the mock-interview
+-- loop: confidence (0..5) is self-rated after practising and feeds readiness.
+CREATE TABLE IF NOT EXISTS interview_questions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    prep_id         INTEGER NOT NULL,
+    category        TEXT NOT NULL,                 -- technical | behavioral | situational | company
+    question        TEXT NOT NULL,
+    difficulty      TEXT NOT NULL DEFAULT 'medium',-- easy | medium | hard
+    talking_points  TEXT NOT NULL DEFAULT '',
+    confidence      INTEGER NOT NULL DEFAULT 0,    -- 0..5 (0 = not yet practised)
+    practiced_count INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL,
+    FOREIGN KEY (prep_id) REFERENCES interview_preps(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_q_prep ON interview_questions(prep_id);
+
 -- Offer keys already reported by `sync`, so a new run only surfaces new offers.
 -- NOTE: this table grows unbounded — there's no pruning of old keys. Fine for a
 -- personal tool (one row per offer ever seen), but if it ever matters, prune by

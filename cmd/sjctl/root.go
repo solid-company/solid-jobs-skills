@@ -50,6 +50,7 @@ func newRootCmd() *cobra.Command {
 
 	root.AddCommand(
 		newSearchCmd(),
+		newOfferCmd(),
 		newTrackCmd(),
 		newSyncCmd(),
 		newStatsCmd(),
@@ -57,6 +58,7 @@ func newRootCmd() *cobra.Command {
 		newProfileCmd(),
 		newWatchCmd(),
 		newEvaluateCmd(),
+		newInterviewCmd(),
 		newVersionCmd(),
 		newUpdateCmd(),
 	)
