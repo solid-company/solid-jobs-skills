@@ -146,3 +146,159 @@ func TestSearchRetriesOn429(t *testing.T) {
 		t.Error("isRemote should be true")
 	}
 }
+
+func TestValidScopeKind(t *testing.T) {
+	cases := map[string]bool{
+		"division":         true,
+		"mainCategory":     true,
+		"subcategory":      true,
+		"subcategoryGroup": true,
+		"city":             true,
+		"SubCategory":      true, // case-insensitive
+		"nonsense":         false,
+		"":                 false,
+	}
+	for in, want := range cases {
+		if got := ValidScopeKind(in); got != want {
+			t.Errorf("ValidScopeKind(%q) = %v, want %v", in, got, want)
+		}
+	}
+}
+
+func TestValidMarketSection(t *testing.T) {
+	cases := map[string]bool{
+		"demand":       true,
+		"salary":       true,
+		"experience":   true,
+		"topLocations": true,
+		"topSkills":    true,
+		"TopSkills":    true, // case-insensitive
+		"salery":       false,
+		"":             false,
+	}
+	for in, want := range cases {
+		if got := ValidMarketSection(in); got != want {
+			t.Errorf("ValidMarketSection(%q) = %v, want %v", in, got, want)
+		}
+	}
+}
+
+func TestBuildMarketStatsURL(t *testing.T) {
+	c := NewClient("my-campaign")
+	raw, err := c.buildMarketStatsURL("subcategory", "React", []string{"demand", "salary"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(u.Path, "/market-statistics/subcategory/React") {
+		t.Errorf("path = %q, want suffix /market-statistics/subcategory/React", u.Path)
+	}
+	q := u.Query()
+	if q.Get("campaign") != "my-campaign" {
+		t.Errorf("campaign = %q", q.Get("campaign"))
+	}
+	if q.Get("fields") != "demand,salary" {
+		t.Errorf("fields = %q, want demand,salary", q.Get("fields"))
+	}
+}
+
+func TestBuildMarketStatsURLOmitsEmptyFields(t *testing.T) {
+	c := NewClient("c")
+	raw, _ := c.buildMarketStatsURL("city", "warszawa", nil)
+	u, _ := url.Parse(raw)
+	if u.Query().Has("fields") {
+		t.Error("fields must be omitted when empty")
+	}
+}
+
+func TestMarketStatisticsInvalidScopeKind(t *testing.T) {
+	c := NewClient("test")
+	if _, err := c.MarketStatistics(context.Background(), "bogus", "React", nil); err == nil {
+		t.Error("want error for invalid scope kind")
+	}
+}
+
+func TestMarketStatisticsDecodes(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Api-Version") != apiVersion {
+			t.Errorf("missing X-Api-Version header")
+		}
+		if got := r.URL.Query().Get("fields"); got != "demand,salary" {
+			t.Errorf("fields = %q, want demand,salary", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"scopeKind":"subcategory","scopeKey":"React",
+			"generatedAt":"2026-07-08T09:15:00Z",
+			"includedSections":["demand","salary"],
+			"demand":{"activeOffers":312,"distinctEmployers":148,"remoteOffers":121,
+				"remotePercentage":39,"offerTrend":[{"period":"2026-Q1","offerCount":312}]},
+			"salary":{"currency":"PLN","overall":{"min":8000,"p25":14000,"median":18000,
+				"p75":23000,"max":38000},"b2b":{"median":20000,"average":20450,"offerCount":176},
+				"permanent":null}}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient("test")
+	c.BaseURL = srv.URL
+
+	res, err := c.MarketStatistics(context.Background(), "subcategory", "React", []string{"demand", "salary"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.ScopeKey != "React" || res.Demand == nil || res.Demand.ActiveOffers != 312 {
+		t.Fatalf("unexpected demand: %+v", res.Demand)
+	}
+	if res.Salary == nil || res.Salary.Overall == nil || res.Salary.Overall.Median != 18000 {
+		t.Fatalf("unexpected salary: %+v", res.Salary)
+	}
+	if res.Salary.B2B == nil || res.Salary.B2B.OfferCount != 176 {
+		t.Fatalf("unexpected b2b: %+v", res.Salary.B2B)
+	}
+	if res.Salary.Permanent != nil {
+		t.Errorf("permanent should be nil, got %+v", res.Salary.Permanent)
+	}
+	if len(res.Demand.OfferTrend) != 1 || res.Demand.OfferTrend[0].Period != "2026-Q1" {
+		t.Errorf("unexpected trend: %+v", res.Demand.OfferTrend)
+	}
+}
+
+// TestMarketStatisticsDecodesBuckets covers the []Bucket sections (experience,
+// topLocations, topSkills) which TestMarketStatisticsDecodes never returns, so a
+// wrong json tag on Bucket would otherwise ship undetected.
+func TestMarketStatisticsDecodesBuckets(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"scopeKind":"subcategory","scopeKey":"React",
+			"generatedAt":"2026-07-08T09:15:00Z",
+			"includedSections":["experience","topLocations","topSkills"],
+			"experience":[{"label":"Senior","offerCount":120,"percentage":38}],
+			"topLocations":[{"label":"Warszawa","offerCount":90,"percentage":29}],
+			"topSkills":[{"label":"TypeScript","offerCount":210,"percentage":67}]}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient("test")
+	c.BaseURL = srv.URL
+
+	res, err := c.MarketStatistics(context.Background(), "subcategory", "React", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Experience) != 1 || res.Experience[0].Label != "Senior" ||
+		res.Experience[0].OfferCount != 120 || res.Experience[0].Percentage != 38 {
+		t.Errorf("unexpected experience: %+v", res.Experience)
+	}
+	if len(res.TopLocations) != 1 || res.TopLocations[0].Label != "Warszawa" ||
+		res.TopLocations[0].OfferCount != 90 {
+		t.Errorf("unexpected topLocations: %+v", res.TopLocations)
+	}
+	if len(res.TopSkills) != 1 || res.TopSkills[0].Label != "TypeScript" ||
+		res.TopSkills[0].Percentage != 67 {
+		t.Errorf("unexpected topSkills: %+v", res.TopSkills)
+	}
+}

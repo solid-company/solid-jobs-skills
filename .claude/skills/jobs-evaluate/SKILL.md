@@ -11,6 +11,7 @@ Judge how well a cached offer fits the user's profile, give a graded verdict, an
 
 1. The offer — fetch it from the cache by key. The offer must have been seen by a prior search; if not, run `/jobs-search` first.
 2. The profile — `sjctl profile show --json` (the default profile, or pass `--profile <name>`).
+3. Market context (optional but recommended for **Salary fit**) — pull live market salary bands for the offer's specialization or division, e.g. `sjctl market subcategory <SubCategory> --fields salary,demand --json` (fall back to `sjctl market division <Division> --fields salary --json`). Compare the offer's band to the market `median`/`p25`/`p75` instead of judging it in a vacuum, and note demand (`activeOffers`, `remotePercentage`) for leverage.
 
 Resolve `sjctl` in this order: (1) on `PATH`, (2) `~/.solid-jobs-skills/bin/sjctl[.exe]`, (3) `./sjctl[.exe]` in the repo. If none exist, install it and use the printed path:
 - macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/solid-company/solid-jobs-skills/v0.3.0/scripts/install-sjctl.sh | bash`
@@ -26,7 +27,7 @@ Score these six dimensions, each A (excellent) to F (disqualifying), then weight
 | Dimension | Weight | What to check |
 |-----------|--------|---------------|
 | Skill match | 30% | Required skills vs the profile's strong/working skills |
-| Salary fit | 25% | Offer band vs the profile's minimum and target |
+| Salary fit | 25% | Offer band vs the profile's minimum and target — and vs the live market band from `sjctl market` (below market median is a yellow flag; top-quartile is a plus) |
 | Seniority fit | 15% | Offer experience level vs profile seniority |
 | Work mode / location | 15% | remote/hybrid/onsite and city vs profile preference |
 | Contract type | 10% | B2B vs employment vs profile preference |

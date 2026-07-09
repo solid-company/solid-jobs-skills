@@ -60,6 +60,18 @@ Divisions and experience levels are case-sensitive (e.g. `Senior`, not `senior`)
 
 Searching caches offers locally, so the keys you show can be tracked or evaluated immediately without re-querying.
 
+## Market context
+
+When the user asks how a role's pay or demand looks — "what do React devs earn?", "is Go in demand in Warsaw?", "typical salary for a senior tester?" — reach for live market statistics instead of scraping offer pages:
+
+```
+sjctl market subcategory React --json          # specialization
+sjctl market division IT --fields salary,demand --json
+sjctl market city warszawa --json              # a whole city (no topLocations)
+```
+
+`scopeKind` ∈ {division, mainCategory, subcategory, subcategoryGroup, city}; add `--fields demand,salary,experience,topLocations,topSkills` to fetch only what you need. Use the `salary` band (min/p25/median/p75/max) and `demand` (activeOffers, remotePercentage, quarterly `offerTrend`) to set salary expectations before or alongside a search. This reflects the whole live market, not just cached offers.
+
 ## Notes
 
 - The API rate limit is 300 req/min; don't loop searches needlessly.

@@ -53,6 +53,7 @@ func newRootCmd() *cobra.Command {
 		newTrackCmd(),
 		newSyncCmd(),
 		newStatsCmd(),
+		newMarketCmd(),
 		newProfileCmd(),
 		newWatchCmd(),
 		newEvaluateCmd(),

@@ -158,6 +158,10 @@ go build -o sjctl ./cmd/sjctl
 # save a watch and check for new offers
 ./sjctl watch add my-go-roles -d IT --term golang --remote
 ./sjctl sync
+
+# live market statistics for a scope (no prior search needed)
+./sjctl market subcategory React
+./sjctl market division IT --fields salary,demand --json
 ```
 
 In Claude Code, use the skills: `/jobs-search`, `/jobs-create-profile`, `/jobs-evaluate`,
@@ -174,6 +178,8 @@ In Claude Code, use the skills: `/jobs-search`, `/jobs-create-profile`, `/jobs-e
 - **Evaluate** offers A–F against your profile, persisted for later review.
 - **Watch & digest** saved searches, reporting only offers you haven't seen.
 - **Stats**: salary min/median/max, remote share, counts by experience level.
+- **Market**: live server-side statistics for a division, category, specialization
+  or city — demand, salary bands, experience mix and top locations/skills.
 
 See [CLAUDE.md](CLAUDE.md) for architecture and the full command reference, and
 [AGENTS.md](AGENTS.md) for using the skills with other agents.

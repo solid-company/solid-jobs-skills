@@ -108,6 +108,56 @@ func (c *Client) Search(ctx context.Context, division string, p SearchParams) (*
 	return &out, nil
 }
 
+// MarketStatistics fetches aggregated market statistics for a single scope.
+// scopeKind is one of ScopeKinds; scopeKey names a value within it (e.g.
+// "subcategory"/"React", "city"/"warszawa"). fields is an optional subset of
+// MarketSections — nil/empty returns all sections available for the scope.
+func (c *Client) MarketStatistics(ctx context.Context, scopeKind, scopeKey string, fields []string) (*MarketStats, error) {
+	if !ValidCampaign(c.Campaign) {
+		return nil, ErrInvalidCampaign
+	}
+	if !ValidScopeKind(scopeKind) {
+		return nil, fmt.Errorf("invalid scope kind %q: valid kinds are %v", scopeKind, ScopeKinds)
+	}
+	if scopeKey == "" {
+		return nil, errors.New("scope key must not be empty")
+	}
+
+	u, err := c.buildMarketStatsURL(scopeKind, scopeKey, fields)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.doWithRetry(ctx, u)
+	if err != nil {
+		return nil, err
+	}
+
+	var out MarketStats
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &out, nil
+}
+
+// buildMarketStatsURL assembles the market-statistics request URL with the
+// campaign and an optional comma-separated fields filter.
+func (c *Client) buildMarketStatsURL(scopeKind, scopeKey string, fields []string) (string, error) {
+	base := strings.TrimRight(c.BaseURL, "/")
+	u, err := url.Parse(base + "/market-statistics/" + url.PathEscape(scopeKind) + "/" + url.PathEscape(scopeKey))
+	if err != nil {
+		return "", err
+	}
+
+	q := u.Query()
+	q.Set("campaign", c.Campaign)
+	if v := strings.Join(fields, ","); v != "" {
+		q.Set("fields", v)
+	}
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
+
 // buildURL assembles the request URL with campaign, paging, sorting and the
 // search.* filter parameters.
 func (c *Client) buildURL(division string, p SearchParams) (string, error) {
