@@ -31,6 +31,8 @@ type Querier interface {
 	IsSeen(ctx context.Context, offerKey string) (bool, error)
 	LatestEvaluation(ctx context.Context, arg LatestEvaluationParams) (Evaluation, error)
 	LatestInterviewPrep(ctx context.Context, arg LatestInterviewPrepParams) (InterviewPrep, error)
+	// Latest prep per offer for a profile (history is preserved, but the list shows
+	// one row per offer), decorated with the offer's title/company/url.
 	ListInterviewPreps(ctx context.Context, profileID int64) ([]ListInterviewPrepsRow, error)
 	ListProfiles(ctx context.Context) ([]Profile, error)
 	ListTracked(ctx context.Context, arg ListTrackedParams) ([]ListTrackedRow, error)

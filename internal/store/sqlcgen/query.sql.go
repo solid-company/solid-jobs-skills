@@ -399,7 +399,7 @@ const latestEvaluation = `-- name: LatestEvaluation :one
 SELECT id, offer_key, profile_id, grade, dimensions, rationale, created_at
 FROM evaluations
 WHERE offer_key = ? AND profile_id = ?
-ORDER BY created_at DESC LIMIT 1
+ORDER BY created_at DESC, id DESC LIMIT 1
 `
 
 type LatestEvaluationParams struct {
@@ -426,7 +426,7 @@ const latestInterviewPrep = `-- name: LatestInterviewPrep :one
 SELECT id, offer_key, profile_id, readiness, gaps, questions_to_ask, summary, created_at, updated_at
 FROM interview_preps
 WHERE offer_key = ? AND profile_id = ?
-ORDER BY created_at DESC LIMIT 1
+ORDER BY created_at DESC, id DESC LIMIT 1
 `
 
 type LatestInterviewPrepParams struct {
@@ -452,30 +452,34 @@ func (q *Queries) LatestInterviewPrep(ctx context.Context, arg LatestInterviewPr
 }
 
 const listInterviewPreps = `-- name: ListInterviewPreps :many
-SELECT p.id, p.offer_key, p.profile_id, p.readiness, p.gaps, p.questions_to_ask,
-       p.summary, p.created_at, p.updated_at,
+SELECT p.id, p.offer_key, p.profile_id, p.readiness, p.summary,
+       p.created_at, p.updated_at,
        o.title, o.company, o.url
 FROM interview_preps p
 JOIN offers o ON o.offer_key = p.offer_key
 WHERE p.profile_id = ?
-ORDER BY p.updated_at DESC
+  AND p.id = (
+      SELECT p2.id FROM interview_preps p2
+      WHERE p2.offer_key = p.offer_key AND p2.profile_id = p.profile_id
+      ORDER BY p2.created_at DESC, p2.id DESC LIMIT 1)
+ORDER BY p.updated_at DESC, p.id DESC
 `
 
 type ListInterviewPrepsRow struct {
-	ID             int64
-	OfferKey       string
-	ProfileID      int64
-	Readiness      int64
-	Gaps           string
-	QuestionsToAsk string
-	Summary        string
-	CreatedAt      string
-	UpdatedAt      string
-	Title          string
-	Company        string
-	Url            sql.NullString
+	ID        int64
+	OfferKey  string
+	ProfileID int64
+	Readiness int64
+	Summary   string
+	CreatedAt string
+	UpdatedAt string
+	Title     string
+	Company   string
+	Url       sql.NullString
 }
 
+// Latest prep per offer for a profile (history is preserved, but the list shows
+// one row per offer), decorated with the offer's title/company/url.
 func (q *Queries) ListInterviewPreps(ctx context.Context, profileID int64) ([]ListInterviewPrepsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listInterviewPreps, profileID)
 	if err != nil {
@@ -490,8 +494,6 @@ func (q *Queries) ListInterviewPreps(ctx context.Context, profileID int64) ([]Li
 			&i.OfferKey,
 			&i.ProfileID,
 			&i.Readiness,
-			&i.Gaps,
-			&i.QuestionsToAsk,
 			&i.Summary,
 			&i.CreatedAt,
 			&i.UpdatedAt,

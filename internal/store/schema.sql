@@ -68,7 +68,8 @@ CREATE INDEX IF NOT EXISTS idx_eval_offer ON evaluations(offer_key, profile_id);
 
 -- Interview preparation sessions. One row per prep of an (offer, profile);
 -- history is preserved (like evaluations) so an offer can be re-prepped. The
--- readiness score is recomputed from the average question confidence.
+-- readiness score starts as the caller's save-time estimate and is recomputed
+-- from the average question confidence once questions are rated.
 CREATE TABLE IF NOT EXISTS interview_preps (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     offer_key        TEXT NOT NULL,

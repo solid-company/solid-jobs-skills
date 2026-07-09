@@ -21,6 +21,46 @@ func ValidConfidence(n int) bool { return n >= 0 && n <= 5 }
 // the mean confidence expressed as a 0..100 percentage of this.
 const confidenceMax = 5
 
+// Accepted enum values, mirroring the tracker/evaluations ValidStatus/ValidGrade
+// pattern. Free-text values are rejected at save time so a typo can't silently
+// create its own group in the by-category orderings.
+const (
+	CategoryTechnical   = "technical"
+	CategoryBehavioral  = "behavioral"
+	CategorySituational = "situational"
+	CategoryCompany     = "company"
+
+	DifficultyEasy   = "easy"
+	DifficultyMedium = "medium"
+	DifficultyHard   = "hard"
+
+	SeverityLow    = "low"
+	SeverityMedium = "medium"
+	SeverityHigh   = "high"
+)
+
+var (
+	validCategories = map[string]bool{
+		CategoryTechnical: true, CategoryBehavioral: true,
+		CategorySituational: true, CategoryCompany: true,
+	}
+	validDifficulties = map[string]bool{
+		DifficultyEasy: true, DifficultyMedium: true, DifficultyHard: true,
+	}
+	validSeverities = map[string]bool{
+		SeverityLow: true, SeverityMedium: true, SeverityHigh: true,
+	}
+)
+
+// ValidCategory reports whether c is a known question category.
+func ValidCategory(c string) bool { return validCategories[c] }
+
+// ValidDifficulty reports whether d is a known question difficulty.
+func ValidDifficulty(d string) bool { return validDifficulties[d] }
+
+// ValidSeverity reports whether s is a known gap severity.
+func ValidSeverity(s string) bool { return validSeverities[s] }
+
 // Gap is one skill/topic the candidate is weaker on for a given offer.
 type Gap struct {
 	Skill    string `json:"skill"`
@@ -54,42 +94,114 @@ type InterviewPrep struct {
 	Questions      []InterviewQuestion `json:"questions,omitempty"`
 	CreatedAt      string              `json:"createdAt"`
 	UpdatedAt      string              `json:"updatedAt"`
-	// Title/Company/URL are populated by ListInterviewPreps for display.
-	Title   string `json:"title,omitempty"`
-	Company string `json:"company,omitempty"`
-	URL     string `json:"url,omitempty"`
+}
+
+// InterviewPrepListItem is one row of ListInterviewPreps: a prep summary
+// decorated with the offer's display fields, following the TrackedOffer
+// precedent of a dedicated list type. Gaps/questions are omitted — load the full
+// prep with LatestInterviewPrep + QuestionsForPrep when the detail is needed.
+type InterviewPrepListItem struct {
+	OfferKey  string `json:"offerKey"`
+	ProfileID int64  `json:"profileId"`
+	Readiness int    `json:"readiness"`
+	Summary   string `json:"summary"`
+	Title     string `json:"title"`
+	Company   string `json:"company"`
+	URL       string `json:"url"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+// InterviewQuestionInput is the caller-supplied shape of a question at save time.
+// It deliberately omits the server-assigned and mock-loop-managed fields (id,
+// prepId, confidence, practicedCount, timestamps) so they can't be supplied on a
+// save only to be silently dropped.
+type InterviewQuestionInput struct {
+	Category      string `json:"category"` // technical | behavioral | situational | company
+	Question      string `json:"question"`
+	Difficulty    string `json:"difficulty"` // easy | medium | hard (blank -> medium)
+	TalkingPoints string `json:"talkingPoints"`
+}
+
+// InterviewPrepInput is the caller-supplied data for SaveInterviewPrep. Like
+// InterviewQuestionInput it carries no server-assigned fields (ids, timestamps)
+// and no computed readiness history.
+type InterviewPrepInput struct {
+	OfferKey       string
+	ProfileID      int64
+	Readiness      int
+	Gaps           []Gap
+	QuestionsToAsk []string
+	Summary        string
+	Questions      []InterviewQuestionInput
 }
 
 // SaveInterviewPrep records a new prep session together with its questions in a
 // single transaction. The offer must be cached. History is preserved, so each
-// call inserts a fresh session. The returned prep carries the assigned IDs.
-func (s *Store) SaveInterviewPrep(ctx context.Context, p InterviewPrep) (*InterviewPrep, error) {
-	ok, err := s.OfferExists(ctx, p.OfferKey)
+// call inserts a fresh session. Enum fields (gap severity, question category and
+// difficulty) are validated so a typo can't silently create its own group. The
+// returned prep carries the assigned IDs; its readiness is the caller's estimate
+// at save time and is recomputed from confidence by RateQuestion.
+func (s *Store) SaveInterviewPrep(ctx context.Context, in InterviewPrepInput) (*InterviewPrep, error) {
+	ok, err := s.OfferExists(ctx, in.OfferKey)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		return nil, fmt.Errorf("%w: offer %q not in cache", ErrNotFound, p.OfferKey)
+		return nil, fmt.Errorf("%w: offer %q not in cache", ErrNotFound, in.OfferKey)
 	}
-	if !ValidReadiness(p.Readiness) {
-		return nil, fmt.Errorf("readiness %d out of range (want 0-100)", p.Readiness)
+	if !ValidReadiness(in.Readiness) {
+		return nil, fmt.Errorf("readiness %d out of range (want 0-100)", in.Readiness)
 	}
 
-	gaps := p.Gaps
+	gaps := in.Gaps
 	if gaps == nil {
 		gaps = []Gap{}
+	}
+	for i, g := range gaps {
+		if g.Skill == "" {
+			return nil, fmt.Errorf("gap %d: skill is required", i)
+		}
+		if !ValidSeverity(g.Severity) {
+			return nil, fmt.Errorf("gap %d: invalid severity %q (want low|medium|high)", i, g.Severity)
+		}
 	}
 	gapsJSON, err := json.Marshal(gaps)
 	if err != nil {
 		return nil, fmt.Errorf("marshal gaps: %w", err)
 	}
-	ask := p.QuestionsToAsk
+	ask := in.QuestionsToAsk
 	if ask == nil {
 		ask = []string{}
 	}
 	askJSON, err := json.Marshal(ask)
 	if err != nil {
 		return nil, fmt.Errorf("marshal questionsToAsk: %w", err)
+	}
+
+	// Validate questions up front (and default blank difficulty to medium) so a
+	// bad one fails before any row is written.
+	questions := make([]InterviewQuestion, len(in.Questions))
+	for i, q := range in.Questions {
+		if q.Question == "" {
+			return nil, fmt.Errorf("question %d: text is required", i)
+		}
+		if !ValidCategory(q.Category) {
+			return nil, fmt.Errorf("question %d: invalid category %q (want technical|behavioral|situational|company)", i, q.Category)
+		}
+		difficulty := q.Difficulty
+		if difficulty == "" {
+			difficulty = DifficultyMedium
+		}
+		if !ValidDifficulty(difficulty) {
+			return nil, fmt.Errorf("question %d: invalid difficulty %q (want easy|medium|hard)", i, q.Difficulty)
+		}
+		questions[i] = InterviewQuestion{
+			Category:      q.Category,
+			Question:      q.Question,
+			Difficulty:    difficulty,
+			TalkingPoints: q.TalkingPoints,
+		}
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -101,12 +213,12 @@ func (s *Store) SaveInterviewPrep(ctx context.Context, p InterviewPrep) (*Interv
 
 	ts := now()
 	prepRow, err := qtx.InsertInterviewPrep(ctx, sqlcgen.InsertInterviewPrepParams{
-		OfferKey:       p.OfferKey,
-		ProfileID:      p.ProfileID,
-		Readiness:      int64(p.Readiness),
+		OfferKey:       in.OfferKey,
+		ProfileID:      in.ProfileID,
+		Readiness:      int64(in.Readiness),
 		Gaps:           string(gapsJSON),
 		QuestionsToAsk: string(askJSON),
-		Summary:        p.Summary,
+		Summary:        in.Summary,
 		CreatedAt:      ts,
 		UpdatedAt:      ts,
 	})
@@ -114,17 +226,13 @@ func (s *Store) SaveInterviewPrep(ctx context.Context, p InterviewPrep) (*Interv
 		return nil, err
 	}
 
-	for i := range p.Questions {
-		q := &p.Questions[i]
-		difficulty := q.Difficulty
-		if difficulty == "" {
-			difficulty = "medium"
-		}
+	for i := range questions {
+		q := &questions[i]
 		id, err := qtx.InsertInterviewQuestion(ctx, sqlcgen.InsertInterviewQuestionParams{
 			PrepID:        prepRow.ID,
 			Category:      q.Category,
 			Question:      q.Question,
-			Difficulty:    difficulty,
+			Difficulty:    q.Difficulty,
 			TalkingPoints: q.TalkingPoints,
 			CreatedAt:     ts,
 			UpdatedAt:     ts,
@@ -134,7 +242,6 @@ func (s *Store) SaveInterviewPrep(ctx context.Context, p InterviewPrep) (*Interv
 		}
 		q.ID = id
 		q.PrepID = prepRow.ID
-		q.Difficulty = difficulty
 		q.CreatedAt = ts
 		q.UpdatedAt = ts
 	}
@@ -142,12 +249,18 @@ func (s *Store) SaveInterviewPrep(ctx context.Context, p InterviewPrep) (*Interv
 		return nil, err
 	}
 
-	p.ID = prepRow.ID
-	p.CreatedAt = prepRow.CreatedAt
-	p.UpdatedAt = prepRow.UpdatedAt
-	p.Gaps = gaps
-	p.QuestionsToAsk = ask
-	return &p, nil
+	return &InterviewPrep{
+		ID:             prepRow.ID,
+		OfferKey:       in.OfferKey,
+		ProfileID:      in.ProfileID,
+		Readiness:      in.Readiness,
+		Gaps:           gaps,
+		QuestionsToAsk: ask,
+		Summary:        in.Summary,
+		Questions:      questions,
+		CreatedAt:      prepRow.CreatedAt,
+		UpdatedAt:      prepRow.UpdatedAt,
+	}, nil
 }
 
 // LatestInterviewPrep returns the most recent prep for an offer+profile, without
@@ -179,33 +292,27 @@ func (s *Store) QuestionsForPrep(ctx context.Context, prepID int64) ([]Interview
 	return out, nil
 }
 
-// ListInterviewPreps returns the latest-updated prep sessions for a profile,
-// each decorated with the offer's title/company/url for display.
-func (s *Store) ListInterviewPreps(ctx context.Context, profileID int64) ([]InterviewPrep, error) {
+// ListInterviewPreps returns the latest prep per offer for a profile (one row
+// per offer even though history is preserved), each decorated with the offer's
+// title/company/url for display and ordered most-recently-updated first.
+func (s *Store) ListInterviewPreps(ctx context.Context, profileID int64) ([]InterviewPrepListItem, error) {
 	rows, err := s.q.ListInterviewPreps(ctx, profileID)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]InterviewPrep, 0, len(rows))
+	out := make([]InterviewPrepListItem, 0, len(rows))
 	for _, r := range rows {
-		p, err := prepFromRow(sqlcgen.InterviewPrep{
-			ID:             r.ID,
-			OfferKey:       r.OfferKey,
-			ProfileID:      r.ProfileID,
-			Readiness:      r.Readiness,
-			Gaps:           r.Gaps,
-			QuestionsToAsk: r.QuestionsToAsk,
-			Summary:        r.Summary,
-			CreatedAt:      r.CreatedAt,
-			UpdatedAt:      r.UpdatedAt,
+		out = append(out, InterviewPrepListItem{
+			OfferKey:  r.OfferKey,
+			ProfileID: r.ProfileID,
+			Readiness: int(r.Readiness),
+			Summary:   r.Summary,
+			Title:     r.Title,
+			Company:   r.Company,
+			URL:       strOrEmpty(r.Url),
+			CreatedAt: r.CreatedAt,
+			UpdatedAt: r.UpdatedAt,
 		})
-		if err != nil {
-			return nil, err
-		}
-		p.Title = r.Title
-		p.Company = r.Company
-		p.URL = strOrEmpty(r.Url)
-		out = append(out, *p)
 	}
 	return out, nil
 }
@@ -284,7 +391,12 @@ func (s *Store) RateQuestion(ctx context.Context, questionID int64, confidence i
 	return prepFromRow(prepRow)
 }
 
-// computeReadiness maps the mean question confidence onto a 0..100 score.
+// computeReadiness maps the mean question confidence onto a 0..100 score. It
+// averages over ALL questions, counting not-yet-practised ones as confidence 0.
+// So the score is a whole-bank mean, not a mean of only what's been drilled:
+// readiness intentionally starts low and climbs as more questions are rated
+// (the first rating on a large bank moves it only a little). This replaces the
+// caller's save-time estimate once RateQuestion runs.
 func computeReadiness(qs []sqlcgen.InterviewQuestion) int {
 	if len(qs) == 0 {
 		return 0

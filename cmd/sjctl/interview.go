@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,15 @@ import (
 	"github.com/solid-company/solid-jobs-skills/internal/jobs"
 	"github.com/solid-company/solid-jobs-skills/internal/store"
 )
+
+// strictUnmarshal decodes JSON into v and rejects unknown keys, so a typo in a
+// hand-authored --gaps/--ask/--questions payload fails loudly instead of being
+// silently dropped.
+func strictUnmarshal(data []byte, v any) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	return dec.Decode(v)
+}
 
 func newInterviewCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -46,19 +56,19 @@ func newInterviewSaveCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var parsedGaps []store.Gap
 			if gaps != "" {
-				if err := json.Unmarshal([]byte(gaps), &parsedGaps); err != nil {
+				if err := strictUnmarshal([]byte(gaps), &parsedGaps); err != nil {
 					return fmt.Errorf("--gaps must be a JSON array of {skill,severity,note}: %w", err)
 				}
 			}
 			var parsedAsk []string
 			if ask != "" {
-				if err := json.Unmarshal([]byte(ask), &parsedAsk); err != nil {
+				if err := strictUnmarshal([]byte(ask), &parsedAsk); err != nil {
 					return fmt.Errorf("--ask must be a JSON array of strings: %w", err)
 				}
 			}
-			var parsedQuestions []store.InterviewQuestion
+			var parsedQuestions []store.InterviewQuestionInput
 			if questions != "" {
-				if err := json.Unmarshal([]byte(questions), &parsedQuestions); err != nil {
+				if err := strictUnmarshal([]byte(questions), &parsedQuestions); err != nil {
 					return fmt.Errorf("--questions must be a JSON array of {category,question,difficulty,talkingPoints}: %w", err)
 				}
 			}
@@ -70,7 +80,7 @@ func newInterviewSaveCmd() *cobra.Command {
 				if err != nil {
 					return fail("resolve profile", err)
 				}
-				p, err := s.Store.SaveInterviewPrep(cmd.Context(), store.InterviewPrep{
+				p, err := s.Store.SaveInterviewPrep(cmd.Context(), store.InterviewPrepInput{
 					OfferKey:       args[0],
 					ProfileID:      pid,
 					Readiness:      readiness,
