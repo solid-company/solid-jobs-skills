@@ -8,10 +8,19 @@ import (
 	"github.com/solid-company/solid-jobs-skills/internal/jobs"
 )
 
-// newOfferLite is the token-lean shape of a newly-seen offer in `sync --json`.
-type newOfferLite struct {
+// syncNewOffer is the token-lean shape of a newly-seen offer in `sync --json`.
+type syncNewOffer struct {
 	Watch string    `json:"watch"`
 	Offer offerLite `json:"offer"`
+}
+
+// syncOutput is the `sync --json` payload. A typed struct (rather than a
+// map[string]any) keeps the output contract in one place, so a field added to
+// the sync result is a compile-time decision here, not a silent omission.
+type syncOutput struct {
+	WatchesRun int            `json:"watchesRun"`
+	TotalSeen  int            `json:"totalSeen"`
+	New        []syncNewOffer `json:"new"`
 }
 
 func newSyncCmd() *cobra.Command {
@@ -30,14 +39,14 @@ func newSyncCmd() *cobra.Command {
 					// Lean projection: drop the heavy per-offer fields (HTML
 					// description, logo, benefits) the digest triage never reads.
 					// Full offers stay cached and are retrievable via `offer show`.
-					newLite := make([]newOfferLite, len(res.New))
+					newLite := make([]syncNewOffer, len(res.New))
 					for i, n := range res.New {
-						newLite[i] = newOfferLite{Watch: n.Watch, Offer: toLiteOne(n.Offer)}
+						newLite[i] = syncNewOffer{Watch: n.Watch, Offer: toLiteOne(n.Offer)}
 					}
-					return printJSON(map[string]any{
-						"watchesRun": res.WatchesRun,
-						"totalSeen":  res.TotalSeen,
-						"new":        newLite,
+					return printJSON(syncOutput{
+						WatchesRun: res.WatchesRun,
+						TotalSeen:  res.TotalSeen,
+						New:        newLite,
 					})
 				}
 				if res.WatchesRun == 0 {
