@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -138,6 +139,53 @@ func (c *Client) MarketStatistics(ctx context.Context, scopeKind, scopeKey strin
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return &out, nil
+}
+
+// MarketRaport fetches the yearly market report for a single role. Unlike
+// MarketStatistics there is no scopeKind and no fields filter — the report
+// always comes back whole, up to 3 calendar years, oldest first.
+func (c *Client) MarketRaport(ctx context.Context, scopeKey string) (*MarketRaport, error) {
+	if !ValidCampaign(c.Campaign) {
+		return nil, ErrInvalidCampaign
+	}
+	if scopeKey == "" {
+		return nil, errors.New("scope key must not be empty")
+	}
+
+	u, err := c.buildMarketRaportURL(scopeKey)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.doWithRetry(ctx, u)
+	if err != nil {
+		return nil, err
+	}
+
+	var out MarketRaport
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	// The API documents "oldest first" but doesn't guarantee ordering in the
+	// wire format; sort defensively so callers can rely on Years[0] being the
+	// earliest year regardless.
+	sort.Slice(out.Years, func(i, j int) bool { return out.Years[i].Year < out.Years[j].Year })
+	return &out, nil
+}
+
+// buildMarketRaportURL assembles the market-statistics/raport request URL
+// with just the campaign param — no scopeKind, no fields.
+func (c *Client) buildMarketRaportURL(scopeKey string) (string, error) {
+	base := strings.TrimRight(c.BaseURL, "/")
+	u, err := url.Parse(base + "/market-statistics/raport/" + url.PathEscape(scopeKey))
+	if err != nil {
+		return "", err
+	}
+
+	q := u.Query()
+	q.Set("campaign", c.Campaign)
+	u.RawQuery = q.Encode()
+	return u.String(), nil
 }
 
 // buildMarketStatsURL assembles the market-statistics request URL with the

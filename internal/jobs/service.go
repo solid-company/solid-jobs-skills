@@ -69,6 +69,11 @@ func (s *Service) MarketStatistics(ctx context.Context, scopeKind, scopeKey stri
 	return s.Client.MarketStatistics(ctx, scopeKind, scopeKey, fields)
 }
 
+// MarketRaport fetches the live yearly market report for a single role.
+func (s *Service) MarketRaport(ctx context.Context, scopeKey string) (*api.MarketRaport, error) {
+	return s.Client.MarketRaport(ctx, scopeKey)
+}
+
 // NewOffer pairs a fresh offer with the watch that surfaced it.
 type NewOffer struct {
 	Watch string    `json:"watch"`

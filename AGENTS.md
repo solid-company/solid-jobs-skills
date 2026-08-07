@@ -18,10 +18,11 @@ user's request matches one, **open that file and follow it** — the frontmatter
 | `jobs-track` | track applications through a pipeline |
 | `jobs-interview` | prepare for an interview / run a mock interview |
 | `jobs-digest` | see what's new since last check |
+| `jobs-market` | ask a standalone pay/demand/trend question — not tied to browsing or evaluating a specific offer |
 
 Routing files: `jobs-search/SKILL.md`, `jobs-create-profile/SKILL.md`,
 `jobs-evaluate/SKILL.md`, `jobs-track/SKILL.md`, `jobs-interview/SKILL.md`,
-`jobs-digest/SKILL.md`.
+`jobs-digest/SKILL.md`, `jobs-market/SKILL.md`.
 
 ## Running sjctl
 

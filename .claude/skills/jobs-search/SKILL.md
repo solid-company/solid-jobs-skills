@@ -63,7 +63,14 @@ Searching caches offers locally, so the keys you show can be tracked or evaluate
 
 ## Market context
 
-When the user asks how a role's pay or demand looks — "what do React devs earn?", "is Go in demand in Warsaw?", "typical salary for a senior tester?" — reach for live market statistics instead of scraping offer pages:
+This section is for salary/demand context that comes up *while browsing or
+filtering offers* (e.g. sanity-checking a `--min-salary` before running a
+search, or adding a one-line market note under a results table). If the
+user's whole ask is a standalone market question with no search/browse
+intent — "what do React devs earn?", "is Go in demand in Warsaw?", "has
+Golang pay changed over the years?" — hand off to `/jobs-market` instead,
+which also knows when to reach for the yearly role-trend endpoint. For inline
+context here, reach for live market statistics instead of scraping offer pages:
 
 ```
 sjctl market subcategory React --json          # specialization
@@ -72,6 +79,8 @@ sjctl market city warszawa --json              # a whole city (no topLocations)
 ```
 
 `scopeKind` ∈ {division, mainCategory, subcategory, subcategoryGroup, city}; add `--fields demand,salary,experience,topLocations,topSkills` to fetch only what you need. Use the `salary` band (min/p25/median/p75/max) and `demand` (activeOffers, remotePercentage, quarterly `offerTrend`) to set salary expectations before or alongside a search. This reflects the whole live market, not just cached offers.
+
+For "has this role's pay changed over the years" questions, use `sjctl market raport <role> --json` instead (a 3-year yearly trend for a single role, no `--fields`) — see `/jobs-market` for the full snapshot-vs-trend decision logic.
 
 ## Notes
 
