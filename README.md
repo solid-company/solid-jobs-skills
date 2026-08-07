@@ -40,7 +40,7 @@ SQLite, `CGO_ENABLED=0`).
 
 ## The skills
 
-Six skills, each a natural-language playbook over `sjctl`. A typical loop:
+Seven skills, each a natural-language playbook over `sjctl`. A typical loop:
 **search** offers → set up your **profile** → **evaluate** the interesting ones →
 **track** what you apply to → **prep** for the interview → **digest** new matches
 as they appear.
@@ -148,6 +148,23 @@ triages them against your profile.
   mode, why it fits, key.
 - **Chains to:** `/jobs-track` or `/jobs-evaluate` for the best ones.
 
+### `/jobs-market` — pay, demand, and trends
+
+Answers standalone market questions by picking between a live scope snapshot
+and a role's yearly trend report.
+
+- **Triggers on:** "what do React devs earn?", "is Go in demand in Warsaw?",
+  "has Golang's pay changed over the years?".
+- **Under the hood:** current/typical pay or demand for a division, category,
+  subcategory, subcategory group, or city → `sjctl market <scopeKind>
+  <scopeKey> --json`. A trend over time for a single role/skill name → `sjctl
+  market raport <role> --json` (a 3-year yearly breakdown, no `--fields`).
+  Both reflect the whole live market, independent of the local offer cache.
+- **Output:** a salary-band/demand summary for a snapshot, or a compact
+  year-over-year table for a trend.
+- **Chains from:** `/jobs-search` and `/jobs-evaluate`, which pull in market
+  context inline but hand off standalone market questions here.
+
 ## Use with other agents
 
 The skills are plain markdown that shell out to `sjctl` with no Claude-specific
@@ -180,10 +197,11 @@ go build -o sjctl ./cmd/sjctl
 # live market statistics for a scope (no prior search needed)
 ./sjctl market subcategory React
 ./sjctl market division IT --fields salary,demand --json
+./sjctl market raport Golang --json   # 3-year yearly trend for a role
 ```
 
 In Claude Code, use the skills: `/jobs-search`, `/jobs-create-profile`,
-`/jobs-evaluate`, `/jobs-track`, `/jobs-interview`, `/jobs-digest`.
+`/jobs-evaluate`, `/jobs-track`, `/jobs-interview`, `/jobs-digest`, `/jobs-market`.
 
 ## Features
 
@@ -198,7 +216,8 @@ In Claude Code, use the skills: `/jobs-search`, `/jobs-create-profile`,
 - **Watch & digest** saved searches, reporting only offers you haven't seen.
 - **Stats**: salary min/median/max, remote share, counts by experience level.
 - **Market**: live server-side statistics for a division, category, specialization
-  or city — demand, salary bands, experience mix and top locations/skills.
+  or city — demand, salary bands, experience mix and top locations/skills. Plus a
+  3-year yearly trend report for a single role via `market raport <role>`.
 
 See [CLAUDE.md](CLAUDE.md) for architecture and the full command reference, and
 [AGENTS.md](AGENTS.md) for using the skills with other agents.

@@ -102,6 +102,16 @@ func ValidScopeKind(s string) bool {
 	return false
 }
 
+// ScopeKindRaport is the special scopeKind value that routes to the
+// market-statistics raport endpoint instead of the regular scope endpoint.
+// It is deliberately excluded from ScopeKinds: raport takes a role name (not
+// a division/category/city value) as scopeKey, and never accepts fields.
+const ScopeKindRaport = "raport"
+
+// IsRaportScopeKind reports whether s names the raport endpoint
+// (case-insensitive, matching the API's path segment).
+func IsRaportScopeKind(s string) bool { return strings.EqualFold(s, ScopeKindRaport) }
+
 // MarketSections lists the section tokens accepted in the `fields` parameter of
 // the market-statistics endpoint.
 var MarketSections = []string{"demand", "salary", "experience", "topLocations", "topSkills"}
@@ -181,4 +191,100 @@ type Bucket struct {
 	Label      string `json:"label"`
 	OfferCount int    `json:"offerCount"`
 	Percentage int    `json:"percentage"`
+}
+
+// MarketRaport is the yearly market report for a single role, returned by
+// GET /public-api/market-statistics/raport/{scopeKey}. Unlike MarketStats
+// there is no scopeKind and no fields filter — the report always comes back
+// whole, up to 3 calendar years, oldest first.
+type MarketRaport struct {
+	ScopeKey    string       `json:"scopeKey"`
+	GeneratedAt time.Time    `json:"generatedAt"`
+	Years       []RaportYear `json:"years"`
+}
+
+// RaportYear is one calendar year's slice of a MarketRaport.
+type RaportYear struct {
+	Year         int                   `json:"year"`
+	OfferCount   int                   `json:"offerCount"`
+	ContractType ContractTypeBreakdown `json:"contractType"`
+	Seniority    SeniorityBreakdown    `json:"seniority"`
+	// Nil when the year has no data at all for that contract type.
+	SalaryB2B       *RaportSalaryStat `json:"salaryB2B"`
+	SalaryPermanent *RaportSalaryStat `json:"salaryUoP"`
+	// Most required skills that year, descending by Count. Length (and any cap
+	// on it) is determined server-side; this client applies no normalization,
+	// so a year with no skill data may decode this as nil rather than empty.
+	TopSkills []RaportSkill `json:"topSkills"`
+}
+
+// ContractTypeBreakdown's Total is the denominator of every Percentage in the
+// breakdown — it is not guaranteed to equal OfferCount (it can coincide, as
+// seen in some fixture years, but offers proposing neither B2B nor a
+// permanent contract fall outside all three buckets, so don't assume
+// equality). Used both at year level and nested inside each SeniorityNode.
+type ContractTypeBreakdown struct {
+	B2BOnly       CountWithPercentage `json:"b2bOnly"`
+	PermanentOnly CountWithPercentage `json:"permanentOnly"`
+	Both          CountWithPercentage `json:"both"`
+	Total         int                 `json:"total"`
+}
+
+// SeniorityBreakdown's Total is the sum of the three levels' Count — it is
+// not guaranteed to equal OfferCount. Offers with no declared experience
+// level fall outside all three levels.
+type SeniorityBreakdown struct {
+	Junior  SeniorityNode `json:"junior"`
+	Regular SeniorityNode `json:"regular"`
+	Senior  SeniorityNode `json:"senior"`
+	Total   int           `json:"total"`
+}
+
+// SeniorityNode is one experience level's count, percentage, and its own
+// independent contract-type split.
+type SeniorityNode struct {
+	Count        int                   `json:"count"`
+	Percentage   int                   `json:"percentage"`
+	ContractType ContractTypeBreakdown `json:"contractType"`
+}
+
+// CountWithPercentage is a raw count plus its share (0-100) of some
+// context-dependent total.
+type CountWithPercentage struct {
+	Count      int `json:"count"`
+	Percentage int `json:"percentage"`
+}
+
+// RaportSalaryStat holds salary levels for one contract type in one year,
+// keyed by seniority. When present, all three seniority keys are always
+// populated — a seniority with no matching offers still appears, with every
+// field at zero.
+type RaportSalaryStat struct {
+	Junior  RaportSalaryBand `json:"junior"`
+	Regular RaportSalaryBand `json:"regular"`
+	Senior  RaportSalaryBand `json:"senior"`
+}
+
+// RaportSalaryBand is a salary band for one seniority level in one year.
+// Assumed monthly PLN, same as MarketStats.SalaryStats — the raport response
+// carries no currency or interval field of its own, so this can't be
+// confirmed from the payload. Figures are a range, not a single point
+// estimate — pooled from both ends of every matching salary range. A zero
+// band (all fields zero, SalaryRangeCount 0) means no data, not PLN 0 — check
+// SalaryRangeCount before treating the figures as real.
+type RaportSalaryBand struct {
+	MedianLower  float64 `json:"medianLower"`
+	MedianUpper  float64 `json:"medianUpper"`
+	AverageLower float64 `json:"averageLower"`
+	AverageUpper float64 `json:"averageUpper"`
+	// Number of salary ranges behind the figures for this seniority — NOT a
+	// distinct offer count. All fields are zero when this seniority has no
+	// salary data that year.
+	SalaryRangeCount int `json:"salaryRangeCount"`
+}
+
+// RaportSkill is one skill and how many offers required it in a given year.
+type RaportSkill struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
 }
