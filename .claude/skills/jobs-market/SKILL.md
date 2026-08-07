@@ -17,8 +17,8 @@ Resolve the `sjctl` binary in this order and use the first that works:
 2. `~/.solid-jobs-skills/bin/sjctl` (`sjctl.exe` on Windows) — where the installer puts it
 3. `./sjctl` / `./sjctl.exe` in the current repo (local dev)
 4. If none exist, install it, then use the path the installer prints on stdout:
-   - macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/solid-company/solid-jobs-skills/v0.4.0/scripts/install-sjctl.sh | bash`
-   - Windows: `irm https://raw.githubusercontent.com/solid-company/solid-jobs-skills/v0.4.0/scripts/install-sjctl.ps1 | iex`
+   - macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/solid-company/solid-jobs-skills/v0.5.0/scripts/install-sjctl.sh | bash`
+   - Windows: `irm https://raw.githubusercontent.com/solid-company/solid-jobs-skills/v0.5.0/scripts/install-sjctl.ps1 | iex`
    - Dev fallback (Go installed, inside the repo): `go run ./cmd/sjctl`
 
 Always pass `--json` so you can parse and reason over the results, then summarize
