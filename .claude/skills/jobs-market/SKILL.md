@@ -30,7 +30,7 @@ search and are independent of the local offer cache used by `stats`.
 | Question shape | Command | What you get |
 |---|---|---|
 | Current/typical pay, demand, "right now" for a division, category, subcategory, subcategory group, or city | `sjctl market <scopeKind> <scopeKey> --json` | A flat live snapshot: `demand`, `salary` (percentile band + B2B/permanent), `experience`, `topLocations`, `topSkills` |
-| "Over the years", "trend", "has X changed", "last N years", a single **role or skill name** (e.g. "Golang", "ManualTester") | `sjctl market raport <role> --json` | A `years[]` array, oldest→newest, up to 3 calendar years: offer volume, contract-type split, seniority split, B2B/UoP salary bands, top skills — one entry per year |
+| "Over the years", "trend", "has X changed", "last N years", a single **role or skill name** (e.g. "Golang", "ManualTester") | `sjctl market raport <role> --json` | A `years[]` array, oldest→newest, up to 3 calendar years: offer volume, contract-type split, seniority split, B2B/UoP salary bands, top skills — one entry per year, **plus a nested `quarters[]` array per year** (Q1→Q4, same breakdown minus top skills) for quarter-level questions |
 | Both in one ask (e.g. "is Go pay rising, and what's typical now?") | Call both | Present the current snapshot and the yearly trend together |
 
 Key differences to keep straight:
@@ -43,9 +43,15 @@ Key differences to keep straight:
   `demand,salary,experience,topLocations,topSkills`. Passing `--fields` with
   `market raport` is rejected — the raport response is always returned whole.
 - **Denominators are local, not global**, in the raport response: each year's
-  `contractType.total` and `seniority.total` are independent of `offerCount` and
-  of each other — don't assume any of them sum to the year's total offers.
-  `salaryB2B`/`salaryUoP` can be `null` for a year with no matching data.
+  (and each quarter's) `contractType.total` and `seniority.total` are
+  independent of `offerCount` and of each other — don't assume any of them
+  sum to the year's/quarter's total offers. `salaryB2B`/`salaryUoP` can be
+  `null` — or the key entirely absent — for a year or quarter with no
+  matching data.
+- **The raport is quarterly under the hood.** Each `years[]` entry carries a
+  `quarters[]` array (Q1→Q4, oldest first) with the same fields as the year
+  itself except `topSkills` (year-only). The current, still-in-progress year
+  may have fewer than 4 quarters.
 
 ## Examples
 
@@ -70,6 +76,13 @@ need. Only expand into contract-type or top-skills detail per year if asked.
 Skip years with all-zero `contractType`/`seniority` totals in the narrative
 (they mean no usable breakdown that year, not zero offers — `offerCount` is
 the real volume figure) but still show the row.
+
+For a quarter-specific question ("how was Q3", "last quarter", "kwartał"),
+drill into that year's `quarters[]` array instead of stopping at the yearly
+row — same fields as the year (minus `topSkills`), one entry per quarter.
+Don't unpack every quarter of every year by default; only go quarterly when
+the question asks for that resolution or when a yearly figure looks like it
+needs the finer trend to explain (e.g. a mid-year swing).
 
 ## Notes
 

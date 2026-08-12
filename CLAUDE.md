@@ -144,10 +144,12 @@ Global flags: `--db`, `--campaign`, `--json`, `--profile`.
 - `GET https://solid.jobs/public-api/market-statistics/raport/{scopeKey}` returns a
   yearly market report for a single **role** (`scopeKey`, e.g. `Golang`) — offer
   volume, contract-type split, seniority split and B2B/UoP salary bands, one entry
-  per calendar year, oldest first, up to 3 years. Unlike the scope endpoint above,
-  there is no `scopeKind` and no `fields` filter — the report always comes back
-  whole. Use it for "how has this role trended" questions; use the scope endpoint
-  for "what's typical right now" questions.
+  per calendar year, oldest first, up to 3 years. Each year also nests a `quarters`
+  breakdown (Q1-Q4, oldest first, same fields minus top skills) for quarter-level
+  questions. Unlike the scope endpoint above, there is no `scopeKind` and no
+  `fields` filter — the report always comes back whole. Use it for "how has this
+  role trended" questions; use the scope endpoint for "what's typical right now"
+  questions.
 
 ## Roadmap
 

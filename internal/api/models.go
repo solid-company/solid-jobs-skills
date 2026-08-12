@@ -193,10 +193,11 @@ type Bucket struct {
 	Percentage int    `json:"percentage"`
 }
 
-// MarketRaport is the yearly market report for a single role, returned by
-// GET /public-api/market-statistics/raport/{scopeKey}. Unlike MarketStats
-// there is no scopeKind and no fields filter — the report always comes back
-// whole, up to 3 calendar years, oldest first.
+// MarketRaport is the yearly (with a quarterly breakdown per year) market
+// report for a single role, returned by GET
+// /public-api/market-statistics/raport/{scopeKey}. Unlike MarketStats there
+// is no scopeKind and no fields filter — the report always comes back whole,
+// up to 3 calendar years, oldest first.
 type MarketRaport struct {
 	ScopeKey    string       `json:"scopeKey"`
 	GeneratedAt time.Time    `json:"generatedAt"`
@@ -216,6 +217,23 @@ type RaportYear struct {
 	// on it) is determined server-side; this client applies no normalization,
 	// so a year with no skill data may decode this as nil rather than empty.
 	TopSkills []RaportSkill `json:"topSkills"`
+	// Quarterly breakdown of this year, Q1-Q4, oldest first. A partial year
+	// (the current, still-in-progress one) may carry fewer than 4 entries.
+	Quarters []RaportQuarter `json:"quarters"`
+}
+
+// RaportQuarter is one calendar quarter's slice of a RaportYear — same shape
+// as the year-level breakdown minus TopSkills, which the API only reports at
+// year granularity.
+type RaportQuarter struct {
+	Quarter      int                   `json:"quarter"`
+	OfferCount   int                   `json:"offerCount"`
+	ContractType ContractTypeBreakdown `json:"contractType"`
+	Seniority    SeniorityBreakdown    `json:"seniority"`
+	// Nil when the quarter has no data at all for that contract type — seen
+	// in practice for salaryUoP, whose key is sometimes omitted entirely.
+	SalaryB2B       *RaportSalaryStat `json:"salaryB2B"`
+	SalaryPermanent *RaportSalaryStat `json:"salaryUoP"`
 }
 
 // ContractTypeBreakdown's Total is the denominator of every Percentage in the

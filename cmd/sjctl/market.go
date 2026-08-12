@@ -191,6 +191,32 @@ func printRaportYear(w io.Writer, year api.RaportYear) {
 	if rest := len(year.TopSkills) - shown; rest > 0 {
 		fmt.Fprintf(w, "    ... and %d more (use --json)\n", rest)
 	}
+
+	if len(year.Quarters) > 0 {
+		fmt.Fprintf(w, "  quarters (%d):\n", len(year.Quarters))
+		for _, q := range year.Quarters {
+			printRaportQuarter(w, q)
+		}
+	}
+}
+
+func printRaportQuarter(w io.Writer, q api.RaportQuarter) {
+	fmt.Fprintf(w, "    Q%d  offerCount=%d\n", q.Quarter, q.OfferCount)
+
+	c := q.ContractType
+	fmt.Fprintf(w, "      contractType (total=%d):\n", c.Total)
+	printRaportBucket(w, "  b2bOnly", c.B2BOnly, c.Total)
+	printRaportBucket(w, "  permanentOnly", c.PermanentOnly, c.Total)
+	printRaportBucket(w, "  both", c.Both, c.Total)
+
+	s := q.Seniority
+	fmt.Fprintf(w, "      seniority (total=%d):\n", s.Total)
+	printRaportSeniorityNode(w, "  junior", s.Junior)
+	printRaportSeniorityNode(w, "  regular", s.Regular)
+	printRaportSeniorityNode(w, "  senior", s.Senior)
+
+	printRaportSalary(w, "B2B", q.SalaryB2B)
+	printRaportSalary(w, "Permanent", q.SalaryPermanent)
 }
 
 func printRaportBucket(w io.Writer, label string, bucket api.CountWithPercentage, total int) {

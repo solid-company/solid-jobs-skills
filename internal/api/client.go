@@ -141,9 +141,10 @@ func (c *Client) MarketStatistics(ctx context.Context, scopeKind, scopeKey strin
 	return &out, nil
 }
 
-// MarketRaport fetches the yearly market report for a single role. Unlike
-// MarketStatistics there is no scopeKind and no fields filter — the report
-// always comes back whole, up to 3 calendar years, oldest first.
+// MarketRaport fetches the yearly (with a quarterly breakdown per year)
+// market report for a single role. Unlike MarketStatistics there is no
+// scopeKind and no fields filter — the report always comes back whole, up
+// to 3 calendar years, oldest first.
 func (c *Client) MarketRaport(ctx context.Context, scopeKey string) (*MarketRaport, error) {
 	if !ValidCampaign(c.Campaign) {
 		return nil, ErrInvalidCampaign

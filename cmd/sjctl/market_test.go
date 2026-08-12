@@ -73,3 +73,40 @@ func TestPrintMarketRaportUnderTenSkillsNoMarker(t *testing.T) {
 		t.Errorf("no truncation marker expected under the cap, got:\n%s", out)
 	}
 }
+
+func TestPrintMarketRaportRendersQuarters(t *testing.T) {
+	var buf bytes.Buffer
+	printMarketRaport(&buf, &api.MarketRaport{
+		ScopeKey: "Golang",
+		Years: []api.RaportYear{{
+			Year:       2026,
+			OfferCount: 20,
+			Quarters: []api.RaportQuarter{
+				{Quarter: 1, OfferCount: 11},
+				{Quarter: 2, OfferCount: 9},
+			},
+		}},
+	})
+	out := buf.String()
+	if !strings.Contains(out, "quarters (2):") {
+		t.Errorf("expected a quarters count header, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Q1  offerCount=11") {
+		t.Errorf("expected Q1 offerCount line, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Q2  offerCount=9") {
+		t.Errorf("expected Q2 offerCount line, got:\n%s", out)
+	}
+}
+
+func TestPrintMarketRaportNoQuartersOmitsSection(t *testing.T) {
+	var buf bytes.Buffer
+	printMarketRaport(&buf, &api.MarketRaport{
+		ScopeKey: "Golang",
+		Years:    []api.RaportYear{{Year: 2026, OfferCount: 20}},
+	})
+	out := buf.String()
+	if strings.Contains(out, "quarters (") {
+		t.Errorf("no quarters section expected when Quarters is empty, got:\n%s", out)
+	}
+}
