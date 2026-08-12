@@ -158,7 +158,8 @@ and a role's yearly trend report.
 - **Under the hood:** current/typical pay or demand for a division, category,
   subcategory, subcategory group, or city → `sjctl market <scopeKind>
   <scopeKey> --json`. A trend over time for a single role/skill name → `sjctl
-  market raport <role> --json` (a 3-year yearly breakdown, no `--fields`).
+  market raport <role> --json` (a 3-year yearly breakdown with a quarterly
+  breakdown nested per year, no `--fields`).
   Both reflect the whole live market, independent of the local offer cache.
 - **Output:** a salary-band/demand summary for a snapshot, or a compact
   year-over-year table for a trend.
@@ -197,7 +198,7 @@ go build -o sjctl ./cmd/sjctl
 # live market statistics for a scope (no prior search needed)
 ./sjctl market subcategory React
 ./sjctl market division IT --fields salary,demand --json
-./sjctl market raport Golang --json   # 3-year yearly trend for a role
+./sjctl market raport Golang --json   # 3-year yearly (+quarterly) trend for a role
 ```
 
 In Claude Code, use the skills: `/jobs-search`, `/jobs-create-profile`,
@@ -217,7 +218,8 @@ In Claude Code, use the skills: `/jobs-search`, `/jobs-create-profile`,
 - **Stats**: salary min/median/max, remote share, counts by experience level.
 - **Market**: live server-side statistics for a division, category, specialization
   or city — demand, salary bands, experience mix and top locations/skills. Plus a
-  3-year yearly trend report for a single role via `market raport <role>`.
+  3-year yearly trend report (with a quarterly breakdown per year) for a
+  single role via `market raport <role>`.
 
 See [CLAUDE.md](CLAUDE.md) for architecture and the full command reference, and
 [AGENTS.md](AGENTS.md) for using the skills with other agents.

@@ -380,7 +380,35 @@ func TestMarketRaportDecodes(t *testing.T) {
 						"junior":{"medianLower":0,"medianUpper":0,"averageLower":0,"averageUpper":0,"salaryRangeCount":0},
 						"regular":{"medianLower":14500,"medianUpper":18500,"averageLower":14500,"averageUpper":18500,"salaryRangeCount":2},
 						"senior":{"medianLower":18000,"medianUpper":22000,"averageLower":19000,"averageUpper":23333,"salaryRangeCount":3}},
-					"topSkills":[{"name":"Golang","count":43},{"name":"Kubernetes","count":19}]
+					"topSkills":[{"name":"Golang","count":43},{"name":"Kubernetes","count":19}],
+					"quarters":[
+						{
+							"quarter":1,"offerCount":11,
+							"contractType":{"b2bOnly":{"count":9,"percentage":82},"permanentOnly":{"count":2,"percentage":18},"both":{"count":0,"percentage":0},"total":11},
+							"seniority":{
+								"junior":{"count":0,"percentage":0,"contractType":{"b2bOnly":{"count":0,"percentage":0},"permanentOnly":{"count":0,"percentage":0},"both":{"count":0,"percentage":0},"total":0}},
+								"regular":{"count":6,"percentage":55,"contractType":{"b2bOnly":{"count":5,"percentage":83},"permanentOnly":{"count":1,"percentage":17},"both":{"count":0,"percentage":0},"total":6}},
+								"senior":{"count":5,"percentage":45,"contractType":{"b2bOnly":{"count":4,"percentage":80},"permanentOnly":{"count":1,"percentage":20},"both":{"count":0,"percentage":0},"total":5}},
+								"total":11},
+							"salaryB2B":{
+								"junior":{"medianLower":0,"medianUpper":0,"averageLower":0,"averageUpper":0,"salaryRangeCount":0},
+								"regular":{"medianLower":21000,"medianUpper":25000,"averageLower":20500,"averageUpper":25500,"salaryRangeCount":5},
+								"senior":{"medianLower":23000,"medianUpper":27000,"averageLower":22500,"averageUpper":27500,"salaryRangeCount":4}}
+						},
+						{
+							"quarter":2,"offerCount":9,
+							"contractType":{"b2bOnly":{"count":9,"percentage":100},"permanentOnly":{"count":0,"percentage":0},"both":{"count":0,"percentage":0},"total":9},
+							"seniority":{
+								"junior":{"count":0,"percentage":0,"contractType":{"b2bOnly":{"count":0,"percentage":0},"permanentOnly":{"count":0,"percentage":0},"both":{"count":0,"percentage":0},"total":0}},
+								"regular":{"count":4,"percentage":44,"contractType":{"b2bOnly":{"count":4,"percentage":100},"permanentOnly":{"count":0,"percentage":0},"both":{"count":0,"percentage":0},"total":4}},
+								"senior":{"count":5,"percentage":56,"contractType":{"b2bOnly":{"count":5,"percentage":100},"permanentOnly":{"count":0,"percentage":0},"both":{"count":0,"percentage":0},"total":5}},
+								"total":9},
+							"salaryB2B":{
+								"junior":{"medianLower":0,"medianUpper":0,"averageLower":0,"averageUpper":0,"salaryRangeCount":0},
+								"regular":{"medianLower":22000,"medianUpper":26000,"averageLower":21500,"averageUpper":26500,"salaryRangeCount":4},
+								"senior":{"medianLower":24000,"medianUpper":28000,"averageLower":23500,"averageUpper":28500,"salaryRangeCount":5}}
+						}
+					]
 				}
 			]
 		}`))
@@ -464,6 +492,29 @@ func TestMarketRaportDecodes(t *testing.T) {
 	if b := y2024.SalaryPermanent.Regular; b.MedianLower != 14500 || b.AverageLower != 14500 ||
 		b.AverageUpper != 18500 || b.SalaryRangeCount != 2 {
 		t.Errorf("unexpected 2024 salaryUoP.regular: %+v", b)
+	}
+
+	if len(y2024.Quarters) != 2 {
+		t.Fatalf("quarters = %d, want 2", len(y2024.Quarters))
+	}
+	q1 := y2024.Quarters[0]
+	if q1.Quarter != 1 || q1.OfferCount != 11 || q1.ContractType.Total != 11 {
+		t.Errorf("unexpected 2024 Q1: %+v", q1)
+	}
+	if q1.SalaryB2B == nil || q1.SalaryB2B.Regular.MedianLower != 21000 {
+		t.Errorf("unexpected 2024 Q1 salaryB2B: %+v", q1.SalaryB2B)
+	}
+	// Q2's fixture omits the salaryUoP key entirely — must decode to nil,
+	// not zero-value, same as the year-level "salaryUoP":null case above.
+	q2 := y2024.Quarters[1]
+	if q2.Quarter != 2 || q2.OfferCount != 9 {
+		t.Errorf("unexpected 2024 Q2: %+v", q2)
+	}
+	if q2.SalaryPermanent != nil {
+		t.Errorf("Q2 salaryUoP should decode to nil SalaryPermanent, got %+v", q2.SalaryPermanent)
+	}
+	if len(y2023.Quarters) != 0 {
+		t.Errorf("2023 quarters = %d, want 0 (fixture has none)", len(y2023.Quarters))
 	}
 }
 
