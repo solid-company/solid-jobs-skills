@@ -236,28 +236,34 @@ func (c *Client) buildURL(division string, p SearchParams) (string, error) {
 		q.Set("sortDirection", p.SortDirection)
 	}
 
-	// Comma-separated multi-value filters.
+	// Multi-value filters. The API ORs comma-joined values only for cities —
+	// repeating search.cities keeps just the first value. Every other filter
+	// must be repeated once per value: a comma-joined categories/subCategories
+	// value is parsed as a bitwise flags enum (silently wrong offers),
+	// experiences returns 400 and searchTerm matches nothing.
 	if v := strings.Join(p.Cities, ","); v != "" {
 		q.Set("search.cities", v)
 	}
-	if v := strings.Join(p.Categories, ","); v != "" {
-		q.Set("search.categories", v)
-	}
-	if v := strings.Join(p.SubCategories, ","); v != "" {
-		q.Set("search.subCategories", v)
-	}
-	if v := strings.Join(p.Experiences, ","); v != "" {
-		q.Set("search.experiences", v)
-	}
-	if v := strings.Join(p.SearchTerms, ","); v != "" {
-		q.Set("search.searchTerm", v)
-	}
+	addEach(q, "search.categories", p.Categories)
+	addEach(q, "search.subCategories", p.SubCategories)
+	addEach(q, "search.experiences", p.Experiences)
+	addEach(q, "search.searchTerm", p.SearchTerms)
 	if p.MinimumSalary > 0 {
 		q.Set("search.minimumSalary", strconv.Itoa(p.MinimumSalary))
 	}
 
 	u.RawQuery = q.Encode()
 	return u.String(), nil
+}
+
+// addEach adds key once per non-empty value, so the API receives
+// key=A&key=B rather than a single comma-joined value.
+func addEach(q url.Values, key string, values []string) {
+	for _, v := range values {
+		if v != "" {
+			q.Add(key, v)
+		}
+	}
 }
 
 // doWithRetry issues the GET and retries on 429 with exponential backoff,
