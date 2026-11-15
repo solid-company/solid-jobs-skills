@@ -135,6 +135,11 @@ Global flags: `--db`, `--campaign`, `--json`, `--profile`.
   (IT, Engineering, Marketing, Sales, HR, Logistics, Finances, Other).
 - No auth — only a mandatory `campaign` param (lowercase/digits/hyphens, ≤64 chars);
   default `solid-jobs-skills`.
+- Multi-value `search.*` filters are encoded per parameter: `search.cities` takes one
+  comma-joined value (`Poznań,Gdańsk`; a repeated param keeps only the first), while
+  `search.categories`, `search.subCategories`, `search.experiences` and
+  `search.searchTerm` must be repeated once per value (a comma-joined value returns
+  wrong offers, a 400, or nothing).
 - Rate limit 300 req/min per IP; the client retries 429 with exponential backoff.
 - `GET https://solid.jobs/public-api/market-statistics/{scopeKind}/{scopeKey}` returns
   aggregated market stats for a scope. `scopeKind` ∈ {division, mainCategory, subcategory,

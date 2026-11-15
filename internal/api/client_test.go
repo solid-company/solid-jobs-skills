@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -72,7 +73,6 @@ func TestBuildURL(t *testing.T) {
 		"sortDirection":        "desc",
 		"search.cities":        "Poznań,Warszawa",
 		"search.categories":    "Developer",
-		"search.experiences":   "Senior,Regular",
 		"search.searchTerm":    "golang",
 		"search.minimumSalary": "20000",
 	}
@@ -81,8 +81,45 @@ func TestBuildURL(t *testing.T) {
 			t.Errorf("query %q = %q, want %q", k, got, want)
 		}
 	}
+	if got := q["search.experiences"]; !slices.Equal(got, []string{"Senior", "Regular"}) {
+		t.Errorf("search.experiences = %q, want repeated [Senior Regular]", got)
+	}
 	if !strings.HasSuffix(u.Path, "/offers/IT") {
 		t.Errorf("path = %q, want suffix /offers/IT", u.Path)
+	}
+}
+
+// TestBuildURLMultiValueFilters pins the per-parameter encoding the API
+// expects: cities comma-joined in one value, every other filter repeated.
+func TestBuildURLMultiValueFilters(t *testing.T) {
+	c := NewClient("c")
+	raw, err := c.buildURL("IT", SearchParams{
+		Cities:        []string{"Poznań", "Gdańsk"},
+		Categories:    []string{"Tester", "Security"},
+		SubCategories: []string{"Python", "DotNet"},
+		Experiences:   []string{"Junior", "Senior"},
+		SearchTerms:   []string{"React", "Angular"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := u.Query()
+
+	want := map[string][]string{
+		"search.cities":        {"Poznań,Gdańsk"},
+		"search.categories":    {"Tester", "Security"},
+		"search.subCategories": {"Python", "DotNet"},
+		"search.experiences":   {"Junior", "Senior"},
+		"search.searchTerm":    {"React", "Angular"},
+	}
+	for k, w := range want {
+		if got := q[k]; !slices.Equal(got, w) {
+			t.Errorf("query %q = %q, want %q", k, got, w)
+		}
 	}
 }
 
